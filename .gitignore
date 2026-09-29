@@ -1,0 +1,43 @@
+# ===== 敏感信息=====
+.env
+.env.*
+!.env.example
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+ENV/
+
+# 测试 / 覆盖率 / 缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ===== IDE / 编辑器 =====
+# 如果你希望把编辑器配置共享给团队，可以删除下面这行
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== 系统 / 其他 =====
+.DS_Store
+Thumbs.db
+*.log
