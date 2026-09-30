@@ -1,33 +1,129 @@
-# ===== 敏感信息=====
+# ===== 敏感信息 =====
 .env
 .env.*
 !.env.example
 
-# ===== Python =====
+# ===== Byte-compiled / optimized / DLL files =====
 __pycache__/
 *.py[cod]
 *$py.class
+
+# C extensions
 *.so
+
+# ===== Distribution / packaging =====
 .Python
 build/
+develop-eggs/
 dist/
-*.egg-info/
+downloads/
+eggs/
 .eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# 虚拟环境
-.venv/
-venv/
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ===== 虚拟环境 =====
+.env
+.venv
 env/
+venv/
 ENV/
+env.bak/
+venv.bak/
 
-# 测试 / 覆盖率 / 缓存
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
+# ===== 测试 / 覆盖率 / 缓存 =====
 htmlcov/
 .tox/
 .nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.ruff_cache/
+cover/
+
+# ===== 翻译文件 =====
+*.mo
+*.pot
+
+# ===== Django =====
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# ===== Flask =====
+instance/
+.webassets-cache
+
+# ===== Scrapy =====
+.scrapy
+
+# ===== Sphinx 文档 =====
+docs/_build/
+
+# ===== PyBuilder =====
+.pybuilder/
+target/
+
+# ===== Jupyter Notebook =====
+.ipynb_checkpoints
+
+# ===== IPython =====
+profile_default/
+ipython_config.py
+
+# ===== PEP 582 =====
+__pypackages__/
+
+# ===== Celery =====
+celerybeat-schedule
+celerybeat.pid
+
+# ===== SageMath =====
+*.sage.py
+
+# ===== Spyder =====
+.spyderproject
+.spyproject
+
+# ===== Rope =====
+.ropeproject
+
+# ===== mkdocs =====
+/site
+
+# ===== 类型检查 =====
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# ===== Cython =====
+cython_debug/
 
 # ===== IDE / 编辑器 =====
 # 如果你希望把编辑器配置共享给团队，可以删除下面这行
