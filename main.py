@@ -46,7 +46,7 @@ if __name__ == "__main__":
         llm=llm,
         tool_registry=tool_registry,
         system_prompt=AGENT_SYSTEM_PROMPT,
-        max_steps=1,
+        max_steps=5,
     )
 
     question = "你好，请帮我查询一下今天北京的天气，然后根据天气推荐一个合适的旅游景点。"

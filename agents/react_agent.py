@@ -59,7 +59,9 @@ class ReActAgent:
             tool_name = re.search(r"(\w+)\(", action_str).group(1)
             args_str = re.search(r"\((.*)\)", action_str).group(1)
             kwargs = dict(re.findall(r'(\w+)="([^"]*)"', args_str))
-
+            
+            observation = self.tool_registry.execute(tool_name,**kwargs)
+        
             # 记录观察结果
             observation_str = f"Observation: {observation}"
             print(f"{observation_str}\n" + "="*40)
