@@ -1,16 +1,17 @@
 import re
 from core.llm_client import OpenAICompatibleClient
+from tools.registry import ToolRegistry
 
 class ReActAgent:
     def __init__(
             self,
             llm: OpenAICompatibleClient,
-            tools: dict,
+            tool_registry: ToolRegistry,
             system_prompt: str,
             max_steps: int = 5,
     ):
         self.llm = llm
-        self.tools = tools.copy()
+        self.tool_registry = tool_registry
         self.system_prompt = system_prompt
         self.max_steps = max_steps
     
@@ -58,11 +59,6 @@ class ReActAgent:
             tool_name = re.search(r"(\w+)\(", action_str).group(1)
             args_str = re.search(r"\((.*)\)", action_str).group(1)
             kwargs = dict(re.findall(r'(\w+)="([^"]*)"', args_str))
-
-            if tool_name in self.tools:
-                observation = self.tools[tool_name](**kwargs)
-            else:
-                observation = f"错误:未定义的工具 '{tool_name}'"
 
             # 记录观察结果
             observation_str = f"Observation: {observation}"
