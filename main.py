@@ -29,6 +29,8 @@ tool_registry.register_function(
     description="根据城市和天气推荐旅游景点",
 )
 
+print(tool_registry.describe())
+
 # 配置LLM客户端
 API_KEY = os.environ.get("OPENAI_API_KEY")
 BASE_URL = os.environ.get("OPENAI_BASE_URL")
@@ -40,7 +42,7 @@ llm = OpenAICompatibleClient(
     base_url=BASE_URL
 )
 
-# 启动入口
+启动入口
 if __name__ == "__main__":
     agent = ReActAgent(
         llm=llm,

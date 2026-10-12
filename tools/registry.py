@@ -1,4 +1,5 @@
 from typing import Callable
+from inspect import signature
 
 class ToolRegistry:
     """管理和执行 Agent 可使用的工具。"""
@@ -36,7 +37,9 @@ class ToolRegistry:
             return "暂无可用工具"
 
         lines = []
-        for name, description in self._descriptions.items():
-            lines.append(f"- {name}: {description}")
+        for name, func in self._tools.items():
+            parameters = signature(func)
+            description = self._descriptions[name]
+            lines.append(f"- {name}{parameters}: {description}")
 
         return "\n".join(lines)

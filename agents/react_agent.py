@@ -18,6 +18,10 @@ class ReActAgent:
     def run(self,user_prompt: str) -> str:
         prompt_history = [f"用户请求: {user_prompt}"]
 
+        system_prompt = self.system_prompt.format(
+            tools=self.tool_registry.describe(),
+        )
+
         print(f"用户输入: {user_prompt}\n" + "="*40)
 
         # --- 运行主循环 ---
@@ -30,7 +34,7 @@ class ReActAgent:
             #  调用LLM进行思考
             llm_output = self.llm.generate(
                 full_prompt, 
-                system_prompt=self.system_prompt
+                system_prompt=system_prompt
             )
             # 模型可能会输出多余的Thought-Action，需要截断
             match = re.search(r'(Thought:.*?Action:.*?)(?=\n\s*(?:Thought:|Action:|Observation:)|\Z)', llm_output, re.DOTALL)
@@ -61,7 +65,7 @@ class ReActAgent:
             kwargs = dict(re.findall(r'(\w+)="([^"]*)"', args_str))
             
             observation = self.tool_registry.execute(tool_name,**kwargs)
-        
+
             # 记录观察结果
             observation_str = f"Observation: {observation}"
             print(f"{observation_str}\n" + "="*40)
