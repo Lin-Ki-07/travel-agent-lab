@@ -1,8 +1,9 @@
+import ast
 import re
+from typing import Any
+
 from core.llm_client import OpenAICompatibleClient
 from tools.registry import ToolRegistry
-import ast
-from typing import Any
 
 class ReActAgent:
     def __init__(
