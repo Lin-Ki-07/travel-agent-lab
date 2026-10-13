@@ -1,6 +1,8 @@
 import re
 from core.llm_client import OpenAICompatibleClient
 from tools.registry import ToolRegistry
+import ast
+from typing import Any
 
 class ReActAgent:
     def __init__(
@@ -31,27 +33,38 @@ class ReActAgent:
             self,
             action_str:str,
     ) -> tuple[str, dict[str, str]] | None:
-        """解析工具调用，返回工具名和参数。"""
-        tool_match = re.fullmatch(
-        r"(\w+)\((.*)\)",
-        action_str,
-        re.DOTALL,
-        )
+        """解析工具调用，只允许关键字参数。"""
 
-        if not tool_match:
+        try:
+            expression = ast.parse(
+                action_str,
+                mode="eval",
+            ).body
+        except SyntaxError:
             return None
         
-        tool_name = tool_match.group(1)
-        args_str = tool_match.group(2)
+        if not isinstance(expression, ast.Call):
+            return None
+        
+        if not isinstance(expression.func, ast.Name):
+            return None
+        
+        if expression.args:
+            # 当前协议只支持 key=value，不支持位置参数
+            return None
+        
+        kwargs: dict[str, Any] = {}
 
-        kwargs = dict(
-        re.findall(
-            r'(\w+)="([^"]*)"',
-            args_str,
-            )
-        )
-
-        return tool_name, kwargs
+        for keyword in expression.keywords:
+            if keyword.arg is None:
+                # 拒绝 **data 这种展开参数
+                return None
+            try:
+                kwargs[keyword.arg] = ast.literal_eval(keyword.value)
+            except (ValueError, TypeError, SyntaxError):
+                # 只接受字符串、数字、布尔值、列表等字面量
+                return None
+        return expression.func.id, kwargs
 
 
     def run(self,user_prompt: str) -> str:
