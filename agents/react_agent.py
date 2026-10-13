@@ -4,6 +4,7 @@ from typing import Any
 
 from core.llm_client import OpenAICompatibleClient
 from tools.registry import ToolRegistry
+from core.message import Message
 
 class ReActAgent:
     def __init__(
@@ -33,7 +34,7 @@ class ReActAgent:
     def _parse_tool_call(
             self,
             action_str:str,
-    ) -> tuple[str, dict[str, str]] | None:
+    ) -> tuple[str, dict[str, Any]] | None:
         """解析工具调用，只允许关键字参数。"""
 
         try:
@@ -69,7 +70,12 @@ class ReActAgent:
 
 
     def run(self,user_prompt: str) -> str:
-        prompt_history = [f"用户请求: {user_prompt}"]
+        history = [
+            Message(
+                role="user",
+                content=user_prompt,
+            )
+        ]
 
         system_prompt = self.system_prompt.format(
             tools=self.tool_registry.describe(),
@@ -82,7 +88,10 @@ class ReActAgent:
             print(f"--- 循环 {i+1} ---\n")
             
             #  构建Prompt
-            full_prompt = "\n".join(prompt_history)
+            full_prompt = "\n".join(
+                str(message)
+                for message in history
+            )
             
             #  调用LLM进行思考
             llm_output = self.llm.generate(
@@ -98,7 +107,12 @@ class ReActAgent:
                     llm_output = truncated
                     print("已截断多余的 Thought-Action 对")
             print(f"模型输出:\n{llm_output}\n")
-            prompt_history.append(llm_output)
+            history.append(
+                Message(
+                    role="assistant",
+                    content=llm_output,
+                )
+            )
             
             # 解析 Action
             action_str = self._parse_action(llm_output)
@@ -110,7 +124,12 @@ class ReActAgent:
                 )
                 observation_str = f"Observation: {observation}"
                 print(f"{observation_str}\n" + "=" * 40)
-                prompt_history.append(observation_str)
+                history.append(
+                    Message(
+                        role="tool",
+                        content=observation,
+                    )
+                )
                 continue
             
             # 处理最终结果
@@ -130,7 +149,12 @@ class ReActAgent:
                 )
                 observation_str = f"Observation: {observation}"
                 print(f"{observation_str}\n" + "=" * 40)
-                prompt_history.append(observation_str)
+                history.append(
+                    Message(
+                        role="tool",
+                        content=observation,
+                    )
+                )
                 continue
 
             # 处理工具调用
@@ -143,16 +167,25 @@ class ReActAgent:
                 )
                 observation_str = f"Observation: {observation}"
                 print(f"{observation_str}\n" + "=" * 40)
-                prompt_history.append(observation_str)
+                history.append(
+                    Message(
+                        role="tool",
+                        content=observation,
+                    )
+                )
                 continue
             
             tool_name, kwargs = tool_call
             observation = self.tool_registry.execute(tool_name, **kwargs)
-            
+            history.append(
+                Message(
+                    role="tool",
+                    content=observation,
+                )
+            )
             # 记录观察结果
             observation_str = f"Observation: {observation}"
             print(f"{observation_str}\n" + "="*40)
-            prompt_history.append(observation_str)
 
         # 达到循环上限
         return f"未能在 {self.max_steps} 步内完成任务。"
