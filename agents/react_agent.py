@@ -87,15 +87,9 @@ class ReActAgent:
         for i in range(self.max_steps): 
             print(f"--- 循环 {i+1} ---\n")
             
-            #  构建Prompt
-            full_prompt = "\n".join(
-                str(message)
-                for message in history
-            )
-            
             #  调用LLM进行思考
             llm_output = self.llm.generate(
-                full_prompt, 
+                history, 
                 system_prompt=system_prompt
             )
 

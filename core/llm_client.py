@@ -1,5 +1,8 @@
 from openai import OpenAI
 from dotenv import load_dotenv
+import traceback
+
+from core.message import Message
 
 load_dotenv() 
 
@@ -11,22 +14,43 @@ class OpenAICompatibleClient:
         self.model = model
         self.client = OpenAI(api_key=api_key, base_url=base_url)
 
-    def generate(self, prompt: str, system_prompt: str) -> str:
-        """调用LLM API来生成回应。"""
+    def generate(
+        self,
+        messages: list[Message],
+        system_prompt: str,
+    ) -> str:
+        """使用结构化消息调用 LLM。"""
         print("正在调用大语言模型...")
+
         try:
-            messages = [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': prompt}
+            api_messages = [
+                {
+                    "role": "system",
+                    "content": system_prompt,
+                }
             ]
+
+            for message in messages:
+                if message.role == "tool":
+                    api_messages.append(
+                        {
+                            "role": "user",
+                            "content": f"Observation: {message.content}",
+                        }
+                    )
+                else:
+                    api_messages.append(message.to_dict())
+
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
-                stream=False
+                messages=api_messages,
+                stream=False,
             )
+
             answer = response.choices[0].message.content
             print("大语言模型响应成功。")
             return answer
-        except Exception as e:
-            print(f"调用LLM API时发生错误: {e}")
-            return "错误:调用语言模型服务时出错。"
+
+        except Exception:
+            traceback.print_exc()
+            raise
