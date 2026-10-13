@@ -51,6 +51,6 @@ class OpenAICompatibleClient:
             print("大语言模型响应成功。")
             return answer
 
-        except Exception:
-            traceback.print_exc()
-            raise
+        except Exception as exc:
+            print(f"调用LLM API时发生错误: {exc}")
+            return "错误:调用语言模型服务时出错。"
