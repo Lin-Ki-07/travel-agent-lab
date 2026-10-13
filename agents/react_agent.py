@@ -15,6 +15,45 @@ class ReActAgent:
         self.system_prompt = system_prompt
         self.max_steps = max_steps
     
+    def _parse_action(self, llm_output: str) -> str | None:
+        """从模型输出中提取 Action 内容。"""
+        action_match = re.search(
+            r"Action:\s*(.*)",
+            llm_output,
+            re.DOTALL,
+        )
+
+        if not action_match:
+            return None
+        return action_match.group(1).strip()
+
+    def _parse_tool_call(
+            self,
+            action_str:str,
+    ) -> tuple[str, dict[str, str]] | None:
+        """解析工具调用，返回工具名和参数。"""
+        tool_match = re.fullmatch(
+        r"(\w+)\((.*)\)",
+        action_str,
+        re.DOTALL,
+        )
+
+        if not tool_match:
+            return None
+        
+        tool_name = tool_match.group(1)
+        args_str = tool_match.group(2)
+
+        kwargs = dict(
+        re.findall(
+            r'(\w+)="([^"]*)"',
+            args_str,
+            )
+        )
+
+        return tool_name, kwargs
+
+
     def run(self,user_prompt: str) -> str:
         prompt_history = [f"用户请求: {user_prompt}"]
 
@@ -36,6 +75,7 @@ class ReActAgent:
                 full_prompt, 
                 system_prompt=system_prompt
             )
+
             # 模型可能会输出多余的Thought-Action，需要截断
             match = re.search(r'(Thought:.*?Action:.*?)(?=\n\s*(?:Thought:|Action:|Observation:)|\Z)', llm_output, re.DOTALL)
             if match:
@@ -46,26 +86,55 @@ class ReActAgent:
             print(f"模型输出:\n{llm_output}\n")
             prompt_history.append(llm_output)
             
-            # 解析并执行行动
-            action_match = re.search(r"Action: (.*)", llm_output, re.DOTALL)
-            if not action_match:
-                observation = "错误: 未能解析到 Action 字段。请确保你的回复严格遵循 'Thought: ... Action: ...' 的格式。"
+            # 解析 Action
+            action_str = self._parse_action(llm_output)
+
+            if action_str is None:
+                observation = (
+                    "错误: 未能解析到 Action 字段。"
+                    "请确保回复包含 Action: ..."
+                )
                 observation_str = f"Observation: {observation}"
-                print(f"{observation_str}\n" + "="*40)
+                print(f"{observation_str}\n" + "=" * 40)
                 prompt_history.append(observation_str)
                 continue
-            action_str = action_match.group(1).strip()
-
+            
+            # 处理最终结果
             if action_str.startswith("Finish"):
-                final_answer = re.match(r"Finish\[(.*)\]", action_str).group(1)
-                return final_answer
-            
-            tool_name = re.search(r"(\w+)\(", action_str).group(1)
-            args_str = re.search(r"\((.*)\)", action_str).group(1)
-            kwargs = dict(re.findall(r'(\w+)="([^"]*)"', args_str))
-            
-            observation = self.tool_registry.execute(tool_name,**kwargs)
+                finish_match = re.fullmatch(
+                    r"Finish\[(.*)\]",
+                    action_str,
+                    re.DOTALL,
+                )
 
+                if finish_match:
+                    return finish_match.group(1).strip()
+                
+                observation = (
+                    "错误: Finish 格式不正确。"
+                    "正确格式应为 Finish[最终答案]"
+                )
+                observation_str = f"Observation: {observation}"
+                print(f"{observation_str}\n" + "=" * 40)
+                prompt_history.append(observation_str)
+                continue
+
+            # 处理工具调用
+            tool_call = self._parse_tool_call(action_str)
+
+            if tool_call is None:
+                observation = (
+                    "错误: 工具调用格式不正确。"
+                    "正确格式应为 tool_name(arg=\"value\")"
+                )
+                observation_str = f"Observation: {observation}"
+                print(f"{observation_str}\n" + "=" * 40)
+                prompt_history.append(observation_str)
+                continue
+            
+            tool_name, kwargs = tool_call
+            observation = self.tool_registry.execute(tool_name, **kwargs)
+            
             # 记录观察结果
             observation_str = f"Observation: {observation}"
             print(f"{observation_str}\n" + "="*40)

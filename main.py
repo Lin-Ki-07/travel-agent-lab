@@ -29,7 +29,6 @@ tool_registry.register_function(
     description="根据城市和天气推荐旅游景点",
 )
 
-print(tool_registry.describe())
 
 # 配置LLM客户端
 API_KEY = os.environ.get("OPENAI_API_KEY")
