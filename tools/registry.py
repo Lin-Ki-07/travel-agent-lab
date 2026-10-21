@@ -24,11 +24,20 @@ class ToolRegistry:
         return name in self._tools
     
     def execute(self, name: str, **kwargs) -> str:
+        """校验参数后执行工具。"""
         if not self.has_tool(name):
             return f"错误:未定义的工具 '{name}'"
-        
+
+        func = self._tools[name]
+        tool_signature = signature(func)
+
         try:
-            return self._tools[name](**kwargs)
+            bound_arguments = tool_signature.bind(**kwargs)
+        except TypeError as exc:
+            return f"错误:工具 '{name}' 参数错误: {exc}"
+
+        try:
+            return func(**bound_arguments.arguments)
         except Exception as exc:
             return f"错误:工具 '{name}' 执行失败: {exc}"
     
