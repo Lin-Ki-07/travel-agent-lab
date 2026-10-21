@@ -1,7 +1,8 @@
-from openai import OpenAI
+from openai import OpenAI, APIError
 from dotenv import load_dotenv
 
 from core.message import Message
+from core.exceptions import LLMError
 
 load_dotenv() 
 
@@ -46,10 +47,18 @@ class OpenAICompatibleClient:
                 stream=False,
             )
 
+            if not response.choices:
+                raise LLMError("模型响应没有包含候选答案")
+
             answer = response.choices[0].message.content
+
+            if not answer or not answer.strip():
+                raise LLMError("模型返回了空内容")
+
             print("大语言模型响应成功。")
             return answer
 
-        except Exception as exc:
-            print(f"调用LLM API时发生错误: {exc}")
-            return "错误:调用语言模型服务时出错。"
+        except APIError as exc:
+            raise LLMError(
+                    f"模型请求失败: {exc}"
+                ) from exc

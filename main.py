@@ -10,6 +10,7 @@ from tools.attraction_tool import get_attraction
 from agents.react_agent import ReActAgent
 from tools.registry import ToolRegistry
 from core.config import AgentConfig
+from core.exceptions import LLMError
 
 # 读取系统提示词
 with open("prompts/system_prompt.md", "r", encoding="utf-8") as f:
@@ -55,8 +56,13 @@ if __name__ == "__main__":
     )
 
     question = "你好，请帮我查询一下今天北京的天气，然后根据天气推荐一个合适的旅游景点。"
-    answer = agent.run(question)
-    print(f"运行结果: {answer}")
+
+    try:
+        answer = agent.run(question)
+    except LLMError as exc:
+        print(f"任务失败: {exc}")
+    else:
+        print(f"运行结果: {answer}")
 
     print("\n本次任务历史：")
     for message in agent.get_history():
