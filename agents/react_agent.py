@@ -5,18 +5,24 @@ from typing import Any
 from core.llm_client import OpenAICompatibleClient
 from tools.registry import ToolRegistry
 from core.message import Message
+from agents.base import Agent
 
-class ReActAgent:
+class ReActAgent(Agent):
     def __init__(
             self,
+            name: str,
             llm: OpenAICompatibleClient,
             tool_registry: ToolRegistry,
             system_prompt: str,
             max_steps: int = 5,
     ):
-        self.llm = llm
+        super().__init__(
+            name=name,
+            llm=llm,
+            system_prompt=system_prompt,
+        )
+
         self.tool_registry = tool_registry
-        self.system_prompt = system_prompt
         self.max_steps = max_steps
     
     def _parse_action(self, llm_output: str) -> str | None:

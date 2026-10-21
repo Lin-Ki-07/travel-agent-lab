@@ -44,6 +44,7 @@ llm = OpenAICompatibleClient(
 # 启动入口
 if __name__ == "__main__":
     agent = ReActAgent(
+        name = "旅行助手",
         llm=llm,
         tool_registry=tool_registry,
         system_prompt=AGENT_SYSTEM_PROMPT,
