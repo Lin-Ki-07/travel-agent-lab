@@ -10,9 +10,21 @@ class OpenAICompatibleClient:
     """
     一个用于调用任何兼容OpenAI接口的LLM服务的客户端。
     """
-    def __init__(self, model: str, api_key: str, base_url: str):
+    def __init__(
+        self,
+        model: str,
+        api_key: str,
+        base_url: str,
+        timeout: float = 60.0,
+        temperature: float = 0.7,
+    ):
         self.model = model
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.temperature = temperature
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+        )
 
     def generate(
         self,
@@ -44,6 +56,7 @@ class OpenAICompatibleClient:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=api_messages,
+                temperature=self.temperature,
                 stream=False,
             )
 

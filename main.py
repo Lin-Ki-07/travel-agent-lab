@@ -50,21 +50,17 @@ tool_registry.register_function(
     ],
 )
 
-
-# 配置LLM客户端
-API_KEY = os.environ.get("OPENAI_API_KEY")
-BASE_URL = os.environ.get("OPENAI_BASE_URL")
-MODEL_ID = os.environ.get("MODEL_ID")
-
-llm = OpenAICompatibleClient(
-    model=MODEL_ID,
-    api_key=API_KEY,
-    base_url=BASE_URL
-)
-
 # 启动入口
 if __name__ == "__main__":
     config = AgentConfig.from_env()
+    
+    llm = OpenAICompatibleClient(
+            model=config.model,
+            api_key=config.api_key,
+            base_url=config.base_url,
+            timeout=config.timeout,
+            temperature=config.temperature,
+        )
 
     agent = ReActAgent(
         name = "旅行助手",
