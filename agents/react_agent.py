@@ -6,6 +6,7 @@ from core.llm_client import OpenAICompatibleClient
 from tools.registry import ToolRegistry
 from core.message import Message
 from agents.base import Agent
+from core.config import AgentConfig
 
 class ReActAgent(Agent):
     def __init__(
@@ -14,7 +15,7 @@ class ReActAgent(Agent):
             llm: OpenAICompatibleClient,
             tool_registry: ToolRegistry,
             system_prompt: str,
-            max_steps: int = 5,
+            config: AgentConfig | None = None,
     ):
         super().__init__(
             name=name,
@@ -23,7 +24,7 @@ class ReActAgent(Agent):
         )
 
         self.tool_registry = tool_registry
-        self.max_steps = max_steps
+        self.config = config if config is not None else AgentConfig()
     
     def _parse_action(self, llm_output: str) -> str | None:
         """从模型输出中提取 Action 内容。"""
@@ -91,7 +92,7 @@ class ReActAgent(Agent):
         print(f"用户输入: {user_prompt}\n" + "="*40)
 
         # --- 运行主循环 ---
-        for i in range(self.max_steps): 
+        for i in range(self.config.max_steps): 
             print(f"--- 循环 {i+1} ---\n")
             
             #  调用LLM进行思考
@@ -189,4 +190,4 @@ class ReActAgent(Agent):
             print(f"{observation_str}\n" + "="*40)
 
         # 达到循环上限
-        return f"未能在 {self.max_steps} 步内完成任务。"
+        return f"未能在 {self.config.max_steps} 步内完成任务。"
