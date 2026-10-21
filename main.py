@@ -18,7 +18,6 @@ with open("prompts/system_prompt.md", "r", encoding="utf-8") as f:
 
 # 注册工具
 tool_registry = ToolRegistry()
-print(tool_registry.describe())
 
 tool_registry.register_function(
     name="get_weather",
@@ -85,5 +84,13 @@ if __name__ == "__main__":
         print(f"运行结果: {answer}")
 
     print("\n本次任务历史：")
+    print("\n工具执行记录：")
+    for record in tool_registry.get_execution_records():
+        print(
+            f"{record.name} "
+            f"参数={record.arguments} "
+            f"耗时={record.duration_ms:.2f}ms "
+            f"成功={record.success}"
+        )
     for message in agent.get_history():
         print(message)

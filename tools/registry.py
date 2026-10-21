@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from inspect import Parameter, signature
 from typing import Any, Callable
+import time
 
 @dataclass(frozen=True)
 class ToolParameter:
@@ -10,6 +11,14 @@ class ToolParameter:
     required: bool = True
     default: Any = None
 
+@dataclass
+class ToolExecutionRecord:
+    name: str
+    arguments: dict[str, Any]
+    result: str
+    duration_ms: float
+    success: bool
+
 class ToolRegistry:
     """管理和执行 Agent 可使用的工具。"""
 
@@ -17,6 +26,7 @@ class ToolRegistry:
         self._tools: dict[str, Callable] = {}
         self._descriptions: dict[str, str] = {}
         self._parameters: dict[str, list[ToolParameter]] = {}
+        self._execution_records: list[ToolExecutionRecord] = []
     
     def _infer_parameters(
         self,
@@ -84,8 +94,18 @@ class ToolRegistry:
     
     def execute(self, name: str, **kwargs) -> str:
         """校验参数后执行工具。"""
+        start_time = time.perf_counter()
+
         if not self.has_tool(name):
-            return f"错误:未定义的工具 '{name}'"
+            result = f"错误:未定义的工具 '{name}'"
+            self._record_execution(
+                name=name,
+                arguments=kwargs,
+                result=result,
+                start_time=start_time,
+                success=False,
+            )
+            return result
 
         func = self._tools[name]
         tool_signature = signature(func)
@@ -93,13 +113,38 @@ class ToolRegistry:
         try:
             bound_arguments = tool_signature.bind(**kwargs)
         except TypeError as exc:
-            return f"错误:工具 '{name}' 参数错误: {exc}"
+            result = f"错误:工具 '{name}' 参数错误: {exc}"
+            self._record_execution(
+                name=name,
+                arguments=kwargs,
+                result=result,
+                start_time=start_time,
+                success=False,
+            )
+            return result
 
         try:
-            return func(**bound_arguments.arguments)
+            result = str(func(**bound_arguments.arguments))
         except Exception as exc:
-            return f"错误:工具 '{name}' 执行失败: {exc}"
-    
+            result = f"错误:工具 '{name}' 执行失败: {exc}"
+            self._record_execution(
+                name=name,
+                arguments=kwargs,
+                result=result,
+                start_time=start_time,
+                success=False,
+            )
+            return result
+
+        self._record_execution(
+            name=name,
+            arguments=kwargs,
+            result=result,
+            start_time=start_time,
+            success=True,
+        )
+        return result
+
     def describe(self) -> str:
         if not self._tools:
             return "暂无可用工具"
@@ -120,3 +165,33 @@ class ToolRegistry:
             )
 
         return "\n".join(lines)
+    
+    def _record_execution(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        result: str,
+        start_time: float,
+        success: bool,
+    ) -> None:
+        duration_ms = (time.perf_counter() - start_time) * 1000
+
+        self._execution_records.append(
+            ToolExecutionRecord(
+                name=name,
+                arguments=arguments.copy(),
+                result=result,
+                duration_ms=duration_ms,
+                success=success,
+            )
+        )
+        
+    def get_execution_records(self) -> list[ToolExecutionRecord]:
+        """返回工具执行记录副本。"""
+        return self._execution_records.copy()
+
+    def clear_execution_records(self) -> None:
+        """清空工具执行记录。"""
+        self._execution_records.clear()
+
+   
