@@ -8,7 +8,7 @@ from core.llm_client import OpenAICompatibleClient
 from tools.weather_tool import get_weather
 from tools.attraction_tool import get_attraction
 from agents.react_agent import ReActAgent
-from tools.registry import ToolRegistry
+from tools.registry import ToolRegistry, ToolParameter
 from core.config import AgentConfig
 from core.exceptions import LLMError
 
@@ -18,17 +18,37 @@ with open("prompts/system_prompt.md", "r", encoding="utf-8") as f:
 
 # 注册工具
 tool_registry = ToolRegistry()
+print(tool_registry.describe())
 
 tool_registry.register_function(
     name="get_weather",
     func=get_weather,
     description="查询指定城市的当前天气",
+    parameters=[
+        ToolParameter(
+            name="city",
+            type="string",
+            description="要查询天气的城市名称",
+        ),
+    ],
 )
 
 tool_registry.register_function(
     name="get_attraction",
     func=get_attraction,
     description="根据城市和天气推荐旅游景点",
+    parameters=[
+        ToolParameter(
+            name="city",
+            type="string",
+            description="旅游城市名称",
+        ),
+        ToolParameter(
+            name="weather",
+            type="string",
+            description="该城市当前天气描述",
+        ),
+    ],
 )
 
 
