@@ -76,12 +76,13 @@ class ReActAgent(Agent):
 
 
     def run(self,user_prompt: str) -> str:
-        history = [
+        self.clear_history()
+        self.add_message(
             Message(
                 role="user",
                 content=user_prompt,
             )
-        ]
+        )
 
         system_prompt = self.system_prompt.format(
             tools=self.tool_registry.describe(),
@@ -95,8 +96,8 @@ class ReActAgent(Agent):
             
             #  调用LLM进行思考
             llm_output = self.llm.generate(
-                history, 
-                system_prompt=system_prompt
+                self.get_history(),
+                system_prompt=system_prompt,
             )
 
             # 模型可能会输出多余的Thought-Action，需要截断
@@ -107,7 +108,7 @@ class ReActAgent(Agent):
                     llm_output = truncated
                     print("已截断多余的 Thought-Action 对")
             print(f"模型输出:\n{llm_output}\n")
-            history.append(
+            self.add_message(
                 Message(
                     role="assistant",
                     content=llm_output,
@@ -124,7 +125,7 @@ class ReActAgent(Agent):
                 )
                 observation_str = f"Observation: {observation}"
                 print(f"{observation_str}\n" + "=" * 40)
-                history.append(
+                self.add_message(
                     Message(
                         role="tool",
                         content=observation,
@@ -149,7 +150,7 @@ class ReActAgent(Agent):
                 )
                 observation_str = f"Observation: {observation}"
                 print(f"{observation_str}\n" + "=" * 40)
-                history.append(
+                self.add_message(
                     Message(
                         role="tool",
                         content=observation,
@@ -167,7 +168,7 @@ class ReActAgent(Agent):
                 )
                 observation_str = f"Observation: {observation}"
                 print(f"{observation_str}\n" + "=" * 40)
-                history.append(
+                self.add_message(
                     Message(
                         role="tool",
                         content=observation,
@@ -177,7 +178,7 @@ class ReActAgent(Agent):
             
             tool_name, kwargs = tool_call
             observation = self.tool_registry.execute(tool_name, **kwargs)
-            history.append(
+            self.add_message(
                 Message(
                     role="tool",
                     content=observation,

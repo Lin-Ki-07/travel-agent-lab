@@ -54,3 +54,7 @@ if __name__ == "__main__":
     question = "你好，请帮我查询一下今天北京的天气，然后根据天气推荐一个合适的旅游景点。"
     answer = agent.run(question)
     print(f"运行结果: {answer}")
+
+    print("\n本次任务历史：")
+    for message in agent.get_history():
+        print(message)
