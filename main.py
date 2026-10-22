@@ -5,7 +5,7 @@ import os
 
 # 导入自定义模块
 from core.llm_client import OpenAICompatibleClient
-from tools.weather_tool import get_weather
+from tools.weather_tool import WeatherTool
 from tools.attraction_tool import get_attraction
 from agents.react_agent import ReActAgent
 from tools.registry import ToolRegistry, ToolParameter
@@ -19,18 +19,7 @@ with open("prompts/system_prompt.md", "r", encoding="utf-8") as f:
 # 注册工具
 tool_registry = ToolRegistry()
 
-tool_registry.register_function(
-    name="get_weather",
-    func=get_weather,
-    description="查询指定城市的当前天气",
-    parameters=[
-        ToolParameter(
-            name="city",
-            type="string",
-            description="要查询天气的城市名称",
-        ),
-    ],
-)
+tool_registry.register_tool(WeatherTool())
 
 tool_registry.register_function(
     name="get_attraction",

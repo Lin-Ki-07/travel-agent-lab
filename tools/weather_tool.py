@@ -1,5 +1,7 @@
 import requests
 
+from tools.base import BaseTool
+
 def get_weather(city: str) -> str:
     """
     通过调用 wttr.in API 查询真实的天气信息。
@@ -29,3 +31,13 @@ def get_weather(city: str) -> str:
     except (KeyError, IndexError) as e:
         # 处理数据解析错误
         return f"错误:解析天气数据失败，可能是城市名称无效 - {e}"
+
+class WeatherTool(BaseTool):
+    def __init__(self):
+        super().__init__(
+            name="get_weather",
+            description="查询指定城市的当前天气",
+        )
+
+    def run(self, city: str) -> str:
+        return get_weather(city)

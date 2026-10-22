@@ -3,6 +3,8 @@ from inspect import Parameter, signature
 from typing import Any, Callable
 import time
 
+from tools.base import BaseTool
+
 @dataclass(frozen=True)
 class ToolParameter:
     name: str
@@ -88,6 +90,14 @@ class ToolRegistry:
         self._tools[name] = func
         self._descriptions[name] = description
         self._parameters[name] = parameters or self._infer_parameters(func)
+
+    def register_tool(self, tool: BaseTool) -> None:
+        """注册工具对象。"""
+        self.register_function(
+            name=tool.name,
+            func=tool.run,
+            description=tool.description,
+        )
 
     def has_tool(self, name: str) -> bool:
         return name in self._tools
