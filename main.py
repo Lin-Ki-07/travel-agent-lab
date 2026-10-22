@@ -9,7 +9,7 @@ from tools.weather_tool import get_weather
 from tools.attraction_tool import get_attraction
 from agents.react_agent import ReActAgent
 from tools.registry import ToolRegistry, ToolParameter
-from core.config import AgentConfig
+from core.config import AgentConfig, LLMConfig
 from core.exceptions import LLMError
 
 # 读取系统提示词
@@ -52,14 +52,15 @@ tool_registry.register_function(
 
 # 启动入口
 if __name__ == "__main__":
-    config = AgentConfig.from_env()
+    agent_config = AgentConfig.from_env()
+    llm_config = LLMConfig.from_env()
     
     llm = OpenAICompatibleClient(
-            model=config.model,
-            api_key=config.api_key,
-            base_url=config.base_url,
-            timeout=config.timeout,
-            temperature=config.temperature,
+            model=llm_config.model,
+            api_key=llm_config.api_key,
+            base_url=llm_config.base_url,
+            timeout=llm_config.timeout,
+            temperature=llm_config.temperature,
         )
 
     agent = ReActAgent(
@@ -67,7 +68,7 @@ if __name__ == "__main__":
         llm=llm,
         tool_registry=tool_registry,
         system_prompt=AGENT_SYSTEM_PROMPT,
-        config=config,
+        config=agent_config,
     )
 
     question = "你好，请帮我查询一下今天北京的天气，然后根据天气推荐一个合适的旅游景点。"
