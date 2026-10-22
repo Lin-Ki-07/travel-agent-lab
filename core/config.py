@@ -63,6 +63,10 @@ class AgentConfig:
         )
 
         api_key = os.getenv(api_key_name, "")
+        
+        # 兼容现有的 DeepSeek 配置
+        if provider == "deepseek" and not api_key:
+            api_key = os.getenv("OPENAI_API_KEY", "")
 
         # 本地服务通常不需要真实密钥
         if provider in {"ollama", "vllm"} and not api_key:
