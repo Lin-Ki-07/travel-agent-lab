@@ -2,84 +2,81 @@ from dotenv import load_dotenv
 load_dotenv()  # 加载 .env
 
 import os
-import re
 
 # 导入自定义模块
 from core.llm_client import OpenAICompatibleClient
-from tools.weather_tool import get_weather
+from tools.weather_tool import WeatherTool
 from tools.attraction_tool import get_attraction
+from agents.react_agent import ReActAgent
+from tools.registry import ToolRegistry, ToolParameter
+from core.config import AgentConfig, LLMConfig
+from core.exceptions import LLMError
 
 # 读取系统提示词
 with open("prompts/system_prompt.md", "r", encoding="utf-8") as f:
     AGENT_SYSTEM_PROMPT = f.read()
 
 # 注册工具
-available_tools = {
-    "get_weather": get_weather,
-    "get_attraction": get_attraction,
-}
+tool_registry = ToolRegistry()
 
-# 配置LLM客户端
-API_KEY = os.environ.get("OPENAI_API_KEY")
-BASE_URL = os.environ.get("OPENAI_BASE_URL")
-MODEL_ID = os.environ.get("MODEL_ID")
+tool_registry.register_tool(WeatherTool())
 
-llm = OpenAICompatibleClient(
-    model=MODEL_ID,
-    api_key=API_KEY,
-    base_url=BASE_URL
+tool_registry.register_function(
+    name="get_attraction",
+    func=get_attraction,
+    description="根据城市和天气推荐旅游景点",
+    parameters=[
+        ToolParameter(
+            name="city",
+            type="string",
+            description="旅游城市名称",
+        ),
+        ToolParameter(
+            name="weather",
+            type="string",
+            description="该城市当前天气描述",
+        ),
+    ],
 )
 
-# --- 初始化 ---
-user_prompt = "你好，请帮我查询一下今天北京的天气，然后根据天气推荐一个合适的旅游景点。"
-prompt_history = [f"用户请求: {user_prompt}"]
-
-print(f"用户输入: {user_prompt}\n" + "="*40)
-
-# --- 运行主循环 ---
-for i in range(5): # 设置最大循环次数
-    print(f"--- 循环 {i+1} ---\n")
+# 启动入口
+if __name__ == "__main__":
+    agent_config = AgentConfig.from_env()
+    llm_config = LLMConfig.from_env()
     
-    #  构建Prompt
-    full_prompt = "\n".join(prompt_history)
-    
-    #  调用LLM进行思考
-    llm_output = llm.generate(full_prompt, system_prompt=AGENT_SYSTEM_PROMPT)
-    # 模型可能会输出多余的Thought-Action，需要截断
-    match = re.search(r'(Thought:.*?Action:.*?)(?=\n\s*(?:Thought:|Action:|Observation:)|\Z)', llm_output, re.DOTALL)
-    if match:
-        truncated = match.group(1).strip()
-        if truncated != llm_output.strip():
-            llm_output = truncated
-            print("已截断多余的 Thought-Action 对")
-    print(f"模型输出:\n{llm_output}\n")
-    prompt_history.append(llm_output)
-    
-    # 解析并执行行动
-    action_match = re.search(r"Action: (.*)", llm_output, re.DOTALL)
-    if not action_match:
-        observation = "错误: 未能解析到 Action 字段。请确保你的回复严格遵循 'Thought: ... Action: ...' 的格式。"
-        observation_str = f"Observation: {observation}"
-        print(f"{observation_str}\n" + "="*40)
-        prompt_history.append(observation_str)
-        continue
-    action_str = action_match.group(1).strip()
+    llm = OpenAICompatibleClient(
+            model=llm_config.model,
+            api_key=llm_config.api_key,
+            base_url=llm_config.base_url,
+            timeout=llm_config.timeout,
+            temperature=llm_config.temperature,
+        )
 
-    if action_str.startswith("Finish"):
-        final_answer = re.match(r"Finish\[(.*)\]", action_str).group(1)
-        print(f"任务完成，最终答案: {final_answer}")
-        break
-    
-    tool_name = re.search(r"(\w+)\(", action_str).group(1)
-    args_str = re.search(r"\((.*)\)", action_str).group(1)
-    kwargs = dict(re.findall(r'(\w+)="([^"]*)"', args_str))
+    agent = ReActAgent(
+        name = "旅行助手",
+        llm=llm,
+        tool_registry=tool_registry,
+        system_prompt=AGENT_SYSTEM_PROMPT,
+        config=agent_config,
+    )
 
-    if tool_name in available_tools:
-        observation = available_tools[tool_name](**kwargs)
+    question = "你好，请帮我查询一下今天北京的天气，然后根据天气推荐一个合适的旅游景点。"
+
+    try:
+        answer = agent.run(question)
+    except LLMError as exc:
+        print(f"任务失败: {exc}")
     else:
-        observation = f"错误:未定义的工具 '{tool_name}'"
+        print(f"运行结果: {answer}")
 
-    # 记录观察结果
-    observation_str = f"Observation: {observation}"
-    print(f"{observation_str}\n" + "="*40)
-    prompt_history.append(observation_str)
+    print("\n本次任务历史：")
+    print("\n工具执行记录：")
+    for record in tool_registry.get_execution_records():
+        print(
+            f"{record.name} "
+            f"参数={record.arguments} "
+            f"耗时={record.duration_ms:.2f}ms "
+            f"成功={record.success}"
+        )
+    for message in agent.get_history():
+        print(message)

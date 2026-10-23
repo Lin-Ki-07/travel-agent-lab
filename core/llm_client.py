@@ -1,5 +1,8 @@
-from openai import OpenAI
+from openai import OpenAI, APIError
 from dotenv import load_dotenv
+
+from core.message import Message
+from core.exceptions import LLMError
 
 load_dotenv() 
 
@@ -7,26 +10,68 @@ class OpenAICompatibleClient:
     """
     一个用于调用任何兼容OpenAI接口的LLM服务的客户端。
     """
-    def __init__(self, model: str, api_key: str, base_url: str):
+    def __init__(
+        self,
+        model: str,
+        api_key: str,
+        base_url: str,
+        timeout: float = 60.0,
+        temperature: float = 0.7,
+    ):
         self.model = model
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.temperature = temperature
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+        )
 
-    def generate(self, prompt: str, system_prompt: str) -> str:
-        """调用LLM API来生成回应。"""
+    def generate(
+        self,
+        messages: list[Message],
+        system_prompt: str,
+    ) -> str:
+        """使用结构化消息调用 LLM。"""
         print("正在调用大语言模型...")
+
         try:
-            messages = [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': prompt}
+            api_messages = [
+                {
+                    "role": "system",
+                    "content": system_prompt,
+                }
             ]
+
+            for message in messages:
+                if message.role == "tool":
+                    api_messages.append(
+                        {
+                            "role": "user",
+                            "content": f"Observation: {message.content}",
+                        }
+                    )
+                else:
+                    api_messages.append(message.to_dict())
+
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
-                stream=False
+                messages=api_messages,
+                temperature=self.temperature,
+                stream=False,
             )
+
+            if not response.choices:
+                raise LLMError("模型响应没有包含候选答案")
+
             answer = response.choices[0].message.content
+
+            if not answer or not answer.strip():
+                raise LLMError("模型返回了空内容")
+
             print("大语言模型响应成功。")
             return answer
-        except Exception as e:
-            print(f"调用LLM API时发生错误: {e}")
-            return "错误:调用语言模型服务时出错。"
+
+        except APIError as exc:
+            raise LLMError(
+                    f"模型请求失败: {exc}"
+                ) from exc
