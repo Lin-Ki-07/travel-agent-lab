@@ -60,23 +60,35 @@ if __name__ == "__main__":
         config=agent_config,
     )
 
-    question = "你好，请帮我查询一下今天北京的天气，然后根据天气推荐一个合适的旅游景点。"
+    print("旅行助手已启动。输入 /new 开始新对话，输入 /quit 退出。")
 
-    try:
-        answer = agent.run(question)
-    except LLMError as exc:
-        print(f"任务失败: {exc}")
-    else:
-        print(f"运行结果: {answer}")
+    while True:
+        try:
+            question = input("\n你：").strip()
+        except LLMError as exc:
+            print(f"任务失败: {exc}")
+      
+        if not question:
+            continue
 
-    print("\n本次任务历史：")
-    print("\n工具执行记录：")
-    for record in tool_registry.get_execution_records():
-        print(
-            f"{record.name} "
-            f"参数={record.arguments} "
-            f"耗时={record.duration_ms:.2f}ms "
-            f"成功={record.success}"
-        )
-    for message in agent.get_history():
-        print(message)
+        if question == "/quit":
+            print("已退出。")
+            break
+
+        if question == "/new":
+            agent.clear_history()
+            print("已清空当前对话历史。")
+            continue
+
+        if question == "/history":
+            print("\n当前对话历史：")
+            for message in agent.get_history():
+                print(message)
+            continue
+        
+        try:
+            answer = agent.run(question)
+        except LLMError as exc:
+            print(f"任务失败: {exc}")
+        else:
+            print(f"助手：{answer}")
