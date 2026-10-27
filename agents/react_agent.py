@@ -77,7 +77,6 @@ class ReActAgent(Agent):
 
 
     def run(self,user_prompt: str) -> str:
-        self.clear_history()
         self.add_message(
             Message(
                 role="user",
