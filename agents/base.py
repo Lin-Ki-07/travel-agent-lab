@@ -27,6 +27,8 @@ class Agent(ABC):
 
     def add_message(self, message: Message) -> None:
         """添加消息，并限制历史长度。"""
+        self._history.append(message)
+        
         overflow = len(self._history) - self.max_history_messages
         if overflow > 0:
             del self._history[:overflow]
