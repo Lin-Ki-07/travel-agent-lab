@@ -12,11 +12,13 @@ class Agent(ABC):
         name: str,
         llm: OpenAICompatibleClient,
         system_prompt: str,
+        max_history_messages: int = 20,
     ):
         self.name = name
         self.llm = llm
         self.system_prompt = system_prompt
         self._history: list[Message] = []
+        self.max_history_messages = max_history_messages
 
     @abstractmethod
     def run(self, user_prompt: str) -> str:
@@ -24,8 +26,10 @@ class Agent(ABC):
         raise NotImplementedError
 
     def add_message(self, message: Message) -> None:
-        """添加一条历史消息。"""
-        self._history.append(message)
+        """添加消息，并限制历史长度。"""
+        overflow = len(self._history) - self.max_history_messages
+        if overflow > 0:
+            del self._history[:overflow]
 
     def get_history(self) -> list[Message]:
         """返回历史消息副本。"""

@@ -17,15 +17,18 @@ class ReActAgent(Agent):
             system_prompt: str,
             config: AgentConfig | None = None,
     ):
+        
+        self.config = config if config is not None else AgentConfig()
+
         super().__init__(
             name=name,
             llm=llm,
             system_prompt=system_prompt,
+            max_history_messages=self.config.max_history_messages,
         )
 
         self.tool_registry = tool_registry
-        self.config = config if config is not None else AgentConfig()
-    
+        
     def _parse_action(self, llm_output: str) -> str | None:
         """从模型输出中提取 Action 内容。"""
         action_match = re.search(
