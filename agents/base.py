@@ -26,13 +26,25 @@ class Agent(ABC):
         raise NotImplementedError
 
     def add_message(self, message: Message) -> None:
-        """添加消息，并限制历史长度。"""
+        """添加消息，超限时按完整轮次删除旧历史。"""
         self._history.append(message)
         
-        overflow = len(self._history) - self.max_history_messages
-        if overflow > 0:
-            del self._history[:overflow]
+        while len(self._history) > self.max_history_messages:
+            next_round_start = next(
+                (
+                    index
+                    for index, item in enumerate(self._history)
+                    if index > 0 and item.role == "user"
+                ),
+                None,
+            )
 
+            if next_round_start is None:
+                # 只剩当前一轮，保留完整的执行上下文。
+                break
+
+            del self._history[:next_round_start]
+        
     def get_history(self) -> list[Message]:
         """返回历史消息副本。"""
         return self._history.copy()
