@@ -17,6 +17,8 @@ from agents.react_agent import ReActAgent
 
 from memory.sqlite_store import SQLiteMemoryStore
 
+from commands.memory_commands import handle_memory_command
+
 
 # 读取系统提示词
 with open("prompts/system_prompt.md", "r", encoding="utf-8") as f:
@@ -49,7 +51,7 @@ tool_registry.register_function(
 if __name__ == "__main__":
     memory_store = SQLiteMemoryStore("data/memory.db")
     tool_registry.register_tool(MemoryTool(memory_store))
-    
+
     agent_config = AgentConfig.from_env()
 
     llm_config = LLMConfig.from_env()
@@ -70,8 +72,10 @@ if __name__ == "__main__":
         config=agent_config,
     )
 
-    print("旅行助手已启动。输入 /new 开始新对话，输入 /quit 退出。")
-
+    print(
+        "旅行助手已启动\n"
+        "输入 /remember 内容 保存长期记忆，/new 开始新对话，/history 查看历史，/quit 退出。"
+    )
     while True:
         try:
             question = input("\n你：").strip()
@@ -95,7 +99,13 @@ if __name__ == "__main__":
             for message in agent.get_history():
                 print(message)
             continue
-        
+
+        command_result = handle_memory_command(question, memory_store)
+
+        if command_result is not None:
+            print(f"助手：{command_result}")
+            continue
+
         try:
             answer = agent.run(question)
         except LLMError as exc:
