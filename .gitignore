@@ -137,3 +137,6 @@ cython_debug/
 .DS_Store
 Thumbs.db
 *.log
+
+# 本地记忆数据
+data/
