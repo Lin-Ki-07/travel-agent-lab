@@ -133,3 +133,28 @@ class SQLiteMemoryStore:
             connection.commit()
 
             return cursor.rowcount > 0
+    
+    def list_recent(self, limit: int = 10) -> list[MemoryItem]:
+        """列出最近创建的记忆。"""
+        if limit < 1:
+            raise ValueError("limit 必须大于等于 1")
+
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            rows = connection.execute(
+                """
+                SELECT id, content, created_at
+                FROM memories
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+        return [
+            MemoryItem(
+                id=row[0],
+                content=row[1],
+                created_at=row[2],
+            )
+            for row in rows
+        ]

@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()  # 加载 .env
 
 import os
+import sqlite3
 
 # 导入自定义模块
 from core.llm_client import OpenAICompatibleClient
@@ -73,9 +74,15 @@ if __name__ == "__main__":
     )
 
     print(
-        "旅行助手已启动\n"
-        "输入 /remember 内容 保存长期记忆，/new 开始新对话，/history 查看历史，/quit 退出。"
+        "你的专属旅行助手已就位！\n"
+        "你可以输入：\n"
+        "/memory-help：查看长期记忆命令；\n"
+        "/new：开始新对话；\n"
+        "/history：查看对话历史；\n"
+        "/quit：退出。\n"
+        "也可以直接和我对话。"
     )
+
     while True:
         try:
             question = input("\n你：").strip()
@@ -100,7 +107,11 @@ if __name__ == "__main__":
                 print(message)
             continue
 
-        command_result = handle_memory_command(question, memory_store)
+        try:
+            command_result = handle_memory_command(question, memory_store)
+        except (sqlite3.Error, ValueError) as exc:
+            print(f"记忆操作失败：{exc}")
+            continue
 
         if command_result is not None:
             print(f"助手：{command_result}")
