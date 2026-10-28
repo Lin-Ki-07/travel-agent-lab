@@ -70,3 +70,33 @@ class SQLiteMemoryStore:
             content=row[1],
             created_at=row[2],
         )
+    
+    def search(self, keyword: str, limit: int = 5) -> list[MemoryItem]:
+        """按字面关键词检索，优先返回最近保存的记忆。"""
+        keyword = keyword.strip()
+        if not keyword:
+            raise ValueError("检索关键词不能为空")
+
+        if limit < 1:
+            raise ValueError("limit 必须大于等于 1")
+
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            rows = connection.execute(
+                """
+                SELECT id, content, created_at
+                FROM memories
+                WHERE instr(content, ?) > 0
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (keyword, limit),
+            ).fetchall()
+
+        return [
+            MemoryItem(
+                id=row[0],
+                content=row[1],
+                created_at=row[2],
+            )
+            for row in rows
+        ]
