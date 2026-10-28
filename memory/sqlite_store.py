@@ -100,3 +100,22 @@ class SQLiteMemoryStore:
             )
             for row in rows
         ]
+    
+    def update(self, memory_id: str, content: str) -> bool:
+        """更新记忆正文；找到并更新时返回 True，否则返回 False。"""
+        content = content.strip()
+        if not content:
+            raise ValueError("记忆内容不能为空")
+
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            cursor = connection.execute(
+                """
+                UPDATE memories
+                SET content = ?
+                WHERE id = ?
+                """,
+                (content, memory_id),
+            )
+            connection.commit()
+
+            return cursor.rowcount > 0
