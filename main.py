@@ -5,12 +5,18 @@ import os
 
 # 导入自定义模块
 from core.llm_client import OpenAICompatibleClient
-from tools.weather_tool import WeatherTool
-from tools.attraction_tool import get_attraction
-from agents.react_agent import ReActAgent
-from tools.registry import ToolRegistry, ToolParameter
 from core.config import AgentConfig, LLMConfig
 from core.exceptions import LLMError
+
+from tools.weather_tool import WeatherTool
+from tools.registry import ToolRegistry, ToolParameter
+from tools.attraction_tool import get_attraction
+from tools.memory_tool import MemoryTool
+
+from agents.react_agent import ReActAgent
+
+from memory.sqlite_store import SQLiteMemoryStore
+
 
 # 读取系统提示词
 with open("prompts/system_prompt.md", "r", encoding="utf-8") as f:
@@ -41,7 +47,11 @@ tool_registry.register_function(
 
 # 启动入口
 if __name__ == "__main__":
+    memory_store = SQLiteMemoryStore("data/memory.db")
+    tool_registry.register_tool(MemoryTool(memory_store))
+    
     agent_config = AgentConfig.from_env()
+
     llm_config = LLMConfig.from_env()
     
     llm = OpenAICompatibleClient(
