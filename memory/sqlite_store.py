@@ -119,3 +119,17 @@ class SQLiteMemoryStore:
             connection.commit()
 
             return cursor.rowcount > 0
+    
+    def delete(self, memory_id: str) -> bool:
+        """按 ID 删除记忆；删除成功返回 True，不存在时返回 False。"""
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            cursor = connection.execute(
+                """
+                DELETE FROM memories
+                WHERE id = ?
+                """,
+                (memory_id,),
+            )
+            connection.commit()
+
+            return cursor.rowcount > 0
