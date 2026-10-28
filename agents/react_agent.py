@@ -3,10 +3,12 @@ import re
 from typing import Any
 
 from core.llm_client import OpenAICompatibleClient
-from tools.registry import ToolRegistry
 from core.message import Message
-from agents.base import Agent
+from core.exceptions import LLMError
 from core.config import AgentConfig
+from tools.registry import ToolRegistry
+from agents.base import Agent
+
 
 class ReActAgent(Agent):
     def __init__(
@@ -78,8 +80,23 @@ class ReActAgent(Agent):
                 return None
         return expression.func.id, kwargs
 
+    def run(self, user_prompt: str) -> str:
+        """执行一轮任务，仅保留成功轮次的历史。"""
+        previous_history = self.get_history()
 
-    def run(self,user_prompt: str) -> str:
+        try:
+            answer = self._run(user_prompt)
+        except LLMError:
+            self._history = previous_history
+            raise
+
+        if answer is None:
+            self._history = previous_history
+            return f"未能在 {self.config.max_steps} 步内完成任务。"
+
+        return answer
+
+    def _run(self, user_prompt: str) -> str | None:
         self.add_message(
             Message(
                 role="user",
@@ -191,5 +208,5 @@ class ReActAgent(Agent):
             observation_str = f"Observation: {observation}"
             print(f"{observation_str}\n" + "="*40)
 
-        # 达到循环上限
-        return f"未能在 {self.config.max_steps} 步内完成任务。"
+        # 达到循环上限，通知 run() 恢复历史。
+        return None
