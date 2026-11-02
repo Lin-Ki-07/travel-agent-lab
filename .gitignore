@@ -140,3 +140,6 @@ Thumbs.db
 
 # 本地记忆数据
 data/
+
+# 版本信息
+docs/
