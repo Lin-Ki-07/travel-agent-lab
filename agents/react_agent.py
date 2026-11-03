@@ -41,7 +41,11 @@ class ReActAgent(Agent):
 
         if not action_match:
             return None
-        return action_match.group(1).strip()
+        
+        action = action_match.group(1).strip()
+        if not action.startswith("Finish["):
+            action = action.splitlines()[0].strip()
+        return action
 
     def _parse_tool_call(
             self,

@@ -11,7 +11,7 @@ from core.exceptions import LLMError
 
 from tools.weather_tool import WeatherTool
 from tools.registry import ToolRegistry, ToolParameter
-from tools.attraction_tool import get_attraction
+from tools.attraction_tool import search_travel_evidence
 from tools.memory_tool import MemoryTool
 
 from agents.react_agent import ReActAgent
@@ -31,19 +31,14 @@ tool_registry = ToolRegistry()
 tool_registry.register_tool(WeatherTool())
 
 tool_registry.register_function(
-    name="get_attraction",
-    func=get_attraction,
-    description="根据城市和天气推荐旅游景点",
+    name="search_travel_evidence",
+    func=search_travel_evidence,
+    description="按旅行问题搜索网页资料，返回编号、标题、URL 和文本证据",
     parameters=[
         ToolParameter(
-            name="city",
+            name="question",
             type="string",
-            description="旅游城市名称",
-        ),
-        ToolParameter(
-            name="weather",
-            type="string",
-            description="该城市当前天气描述",
+            description="需要检索的完整旅行问题",
         ),
     ],
 )
