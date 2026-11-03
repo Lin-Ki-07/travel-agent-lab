@@ -4,8 +4,6 @@
 
 当前阶段为 **v0.2.1：最小 Web RAG**。版本号是学习阶段编号，Git 标签和 Release 单独管理。
 
-阶段记录：[v0.2.1](docs/version-0.2.1.md) · [v0.2.0](docs/version-0.2.0.md)。
-
 ## 当前能力
 
 - 文本 ReAct 循环：模型输出 Action，Python 解析并执行工具，将 Observation 回传模型。
