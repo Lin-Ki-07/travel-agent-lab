@@ -2,14 +2,14 @@
 
 一个使用 Python 自主实现的旅行 ReAct Agent：查询城市当前天气，再结合天气搜索景点建议。支持连续对话和 SQLite 长期记忆，明确的记忆命令直接操作数据库，旅行任务由 Agent 执行。
 
-当前阶段为 **v0.2.0：多轮对话与本地长期记忆**。版本号是学习阶段编号，Git 标签和 Release 单独管理。
+当前阶段为 **v0.2.1：最小 Web RAG**。版本号是学习阶段编号，Git 标签和 Release 单独管理。
 
-阶段记录：[v0.2.0](docs/version-0.2.0.md) · [v0.1.0](docs/version-0.1.0.md)。
+阶段记录：[v0.2.1](docs/version-0.2.1.md) · [v0.2.0](docs/version-0.2.0.md)。
 
 ## 当前能力
 
 - 文本 ReAct 循环：模型输出 Action，Python 解析并执行工具，将 Observation 回传模型。
-- 天气查询：wttr.in；景点搜索：Tavily。
+- 天气查询：wttr.in；旅行网页证据搜索：Tavily，保留来源编号、标题、URL 和文本。
 - 函数和工具对象注册，函数签名绑定检查，执行耗时和结果记录。
 - 结构化 Message、Agent 抽象基类、独立的 AgentConfig 与 LLMConfig。
 - OpenAI 兼容模型客户端、模型调用异常处理、工具请求超时。
@@ -17,7 +17,7 @@
 - SQLite 记忆新增、读取、字面关键词搜索、更新、删除和最近记录列表。
 - 直接记忆命令不调用模型；MemoryTool 为 Agent 提供同一套存储能力。
 
-当前为本地单用户命令行原型。对话历史只存在内存中，长期记忆保存在 `data/memory.db`，该目录已被 Git 忽略。尚无语义检索、RAG、LangChain、Web 界面或完整行程规划。多 provider 配置表示地址和密钥解析能力，不代表已逐一验证所有服务。
+当前为本地单用户命令行原型。对话历史只存在内存中，长期记忆保存在 `data/memory.db`，该目录已被 Git 忽略。已支持最小 Web RAG；尚无向量数据库、embedding、本地知识库、LangChain、Web 界面或完整行程规划。多 provider 配置表示地址和密钥解析能力，不代表已逐一验证所有服务。
 
 ## 快速开始
 
