@@ -1,17 +1,21 @@
 import os
 from tavily import TavilyClient
 
-def get_attraction(city: str, weather: str) -> str:
+def search_travel_evidence(question: str) -> str:
     """
     搜索旅行资料，返回带来源编号的证据。
     """
+
+    if not question.strip():
+        return "搜索失败：旅行问题不能为空。"
+    
     # 从环境变量中读取API密钥
     api_key = os.environ.get("TAVILY_API_KEY")
     if not api_key:
         return "错误:未配置TAVILY_API_KEY环境变量。"
     
     # 构造一个精确的查询
-    query = f"'{city}' 在'{weather}'天气下最值得去的旅游景点推荐及理由"
+    query = question.strip()
     
     try:
         response = TavilyClient(api_key=api_key).search(
@@ -41,7 +45,7 @@ def get_attraction(city: str, weather: str) -> str:
         
         if len(evidence) == 5:
             break
-        
+
     if not evidence:
         return "搜索完成，但没有找到可引用的旅行资料。"
     
