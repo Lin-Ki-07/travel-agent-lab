@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 
 @dataclass(frozen=True)
@@ -79,3 +79,35 @@ class WeatherSnapshot:
         if self.min_temp_c > self.max_temp_c:
             raise ValueError("最低温度不能高于最高温度")
         
+@dataclass(frozen=True)
+class Activity:
+    place_id: str
+    description: str
+    start_time: time
+    end_time: time
+
+    def __post_init__(self) -> None:
+        if not self.place_id.strip():
+            raise ValueError("活动地点 ID 不能为空")
+        if not self.description.strip():
+            raise ValueError("活动内容不能为空")
+        if self.start_time >= self.end_time:
+            raise ValueError("活动开始时间必须早于结束时间")
+
+
+@dataclass(frozen=True)
+class TransportSegment:
+    from_place_id: str
+    to_place_id: str
+    mode: str
+    estimated_minutes: int | None = None
+
+    def __post_init__(self) -> None:
+        if not self.from_place_id.strip() or not self.to_place_id.strip():
+            raise ValueError("交通段起终点 ID 不能为空")
+        if self.from_place_id == self.to_place_id:
+            raise ValueError("交通段起点和终点不能相同")
+        if not self.mode.strip():
+            raise ValueError("交通方式不能为空")
+        if self.estimated_minutes is not None and self.estimated_minutes <= 0:
+            raise ValueError("预估交通时间必须大于 0")
