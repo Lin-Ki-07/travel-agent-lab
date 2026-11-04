@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 
 @dataclass(frozen=True)
@@ -111,3 +111,43 @@ class TransportSegment:
             raise ValueError("交通方式不能为空")
         if self.estimated_minutes is not None and self.estimated_minutes <= 0:
             raise ValueError("预估交通时间必须大于 0")
+        
+@dataclass(frozen=True)
+class DailyPlan:
+    day_number: int
+    plan_date: date
+    weather: WeatherSnapshot
+    activities: list[Activity]
+    transport_segments: list[TransportSegment] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.day_number < 1:
+            raise ValueError("行程日序号必须大于等于 1")
+        if self.weather.forecast_date != self.plan_date:
+            raise ValueError("每日天气日期必须与行程日期一致")
+        if not self.activities:
+            raise ValueError("每日行程至少需要一项活动")
+
+
+@dataclass(frozen=True)
+class Itinerary:
+    request: TripRequest
+    places: list[Place]
+    daily_plans: list[DailyPlan]
+    estimated_total_cny: int | None
+    generated_at: datetime
+
+    def __post_init__(self) -> None:
+        if self.generated_at.tzinfo is None:
+            raise ValueError("生成时间必须包含时区")
+        if len(self.daily_plans) != self.request.days:
+            raise ValueError("每日计划数量必须等于旅行天数")
+        if self.estimated_total_cny is not None and self.estimated_total_cny < 0:
+            raise ValueError("预计总费用不能为负数")
+
+        for index, plan in enumerate(self.daily_plans, start=1):
+            expected_date = self.request.start_date + timedelta(days=index - 1)
+            if plan.day_number != index:
+                raise ValueError("每日计划序号必须从 1 连续递增")
+            if plan.plan_date != expected_date:
+                raise ValueError("每日计划日期必须从出发日期连续递增")
