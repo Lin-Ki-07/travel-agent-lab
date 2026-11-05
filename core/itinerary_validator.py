@@ -66,6 +66,12 @@ def parse_itinerary(
             if place_id not in place_map:
                 raise ValueError(f"活动引用了未查询到的地点：{place_id}")
             activities.append(activity)
+            
+        for previous, current in zip(activities, activities[1:]):
+            if current.start_time < previous.start_time:
+                raise ValueError(f"第 {index} 天活动未按开始时间排序")
+            if current.start_time < previous.end_time:
+                raise ValueError(f"第 {index} 天活动时间重叠")
 
         transport_segments: list[TransportSegment] = []
         for transport_data in item.get("transport_segments", []):
