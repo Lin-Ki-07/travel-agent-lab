@@ -66,7 +66,7 @@ def parse_itinerary(
             if place_id not in place_map:
                 raise ValueError(f"活动引用了未查询到的地点：{place_id}")
             activities.append(activity)
-            
+
         for previous, current in zip(activities, activities[1:]):
             if current.start_time < previous.start_time:
                 raise ValueError(f"第 {index} 天活动未按开始时间排序")
@@ -91,6 +91,18 @@ def parse_itinerary(
             ):
                 raise ValueError(f"交通段引用了未查询到的地点")
             transport_segments.append(segment)
+
+        expected_routes = [
+            (previous.place_id, current.place_id)
+            for previous, current in zip(activities, activities[1:])
+            if previous.place_id != current.place_id
+        ]
+        actual_routes = [
+            (segment.from_place_id, segment.to_place_id)
+            for segment in transport_segments
+        ]
+        if actual_routes != expected_routes:
+            raise ValueError(f"第 {index} 天交通段必须按活动地点顺序连接")
 
         daily_plans.append(
             DailyPlan(
