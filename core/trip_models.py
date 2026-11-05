@@ -119,6 +119,8 @@ class DailyPlan:
     weather: WeatherSnapshot
     activities: list[Activity]
     transport_segments: list[TransportSegment] = field(default_factory=list)
+    estimated_cost_cny: int | None = None
+    cost_basis: str | None = None
 
     def __post_init__(self) -> None:
         if self.day_number < 1:
@@ -127,7 +129,13 @@ class DailyPlan:
             raise ValueError("每日天气日期必须与行程日期一致")
         if not self.activities:
             raise ValueError("每日行程至少需要一项活动")
-
+        if self.estimated_cost_cny is not None:
+            if type(self.estimated_cost_cny) is not int or self.estimated_cost_cny < 0:
+                raise ValueError("每日预计费用必须是非负整数")
+            if not self.cost_basis or not self.cost_basis.strip():
+                raise ValueError("填写每日预计费用时必须说明估算依据")
+        elif self.cost_basis is not None:
+            raise ValueError("每日费用未知时，估算依据必须为 null")
 
 @dataclass(frozen=True)
 class Itinerary:
@@ -151,3 +159,20 @@ class Itinerary:
                 raise ValueError("每日计划序号必须从 1 连续递增")
             if plan.plan_date != expected_date:
                 raise ValueError("每日计划日期必须从出发日期连续递增")
+
+        daily_costs = [plan.estimated_cost_cny for plan in self.daily_plans]
+        if any(cost is None for cost in daily_costs):
+            if self.estimated_total_cny is not None:
+                raise ValueError("每日费用未全部确定时，总费用必须为 null")
+        else:
+            if type(self.estimated_total_cny) is not int:
+                raise ValueError("每日费用完整时，必须填写整数总费用")
+            if self.estimated_total_cny != sum(daily_costs):
+                raise ValueError("预计总费用必须等于每日费用之和")
+
+        if (
+            self.request.budget_cny is not None
+            and self.estimated_total_cny is not None
+            and self.estimated_total_cny > self.request.budget_cny
+        ):
+            raise ValueError("预计总费用超过用户预算")

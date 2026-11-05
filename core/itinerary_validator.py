@@ -104,17 +104,26 @@ def parse_itinerary(
         if actual_routes != expected_routes:
             raise ValueError(f"第 {index} 天交通段必须按活动地点顺序连接")
 
-        daily_plans.append(
-            DailyPlan(
-                day_number=index,
-                plan_date=plan_date,
-                weather=weather_map[plan_date],
-                activities=activities,
-                transport_segments=transport_segments,
+        try:
+            daily_plans.append(
+                DailyPlan(
+                    day_number=index,
+                    plan_date=plan_date,
+                    weather=weather_map[plan_date],
+                    activities=activities,
+                    transport_segments=transport_segments,
+                    estimated_cost_cny=item["estimated_cost_cny"],
+                    cost_basis=item["cost_basis"],
+                )
             )
-        )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"第 {index} 天预算字段不合法：{exc}") from exc
 
-    estimated_total_cny = data.get("estimated_total_cny")
+    try:
+        estimated_total_cny = data["estimated_total_cny"]
+    except KeyError as exc:
+        raise ValueError("缺少 estimated_total_cny 字段") from exc
+
     if estimated_total_cny is not None and not isinstance(
         estimated_total_cny, int
     ):
