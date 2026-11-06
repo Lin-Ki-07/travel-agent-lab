@@ -1,8 +1,8 @@
 # Travel Agent Lab
 
-一个使用 Python 自主实现的旅行 ReAct Agent：查询城市当前天气，再结合天气搜索景点建议。支持连续对话和 SQLite 长期记忆，明确的记忆命令直接操作数据库，旅行任务由 Agent 执行。
+一个使用 Python 实现的命令行旅行助手：普通旅行问答使用 ReAct 与 Web RAG；`/plan` 根据旅行需求、地点、天气和网页资料生成结构化逐日行程。支持连续对话和 SQLite 长期记忆。
 
-当前阶段为 **v0.2.1：最小 Web RAG**。版本号是学习阶段编号，Git 标签和 Release 单独管理。
+当前开发阶段为 **v0.3.0：结构化行程规划**。版本号是学习阶段编号，Git 标签和 Release 单独管理。
 
 ## 当前能力
 
@@ -14,8 +14,11 @@
 - 连续对话，按完整轮次裁剪旧历史；模型调用失败或步数耗尽时恢复本轮开始前的历史。
 - SQLite 记忆新增、读取、字面关键词搜索、更新、删除和最近记录列表。
 - 直接记忆命令不调用模型；MemoryTool 为 Agent 提供同一套存储能力。
+- `/plan` 收集目的地、出发日期、天数或结束日期、人数、全程预算和偏好；先校验请求，再查询高德地点、wttr.in 逐日天气和 Tavily 网页证据。
+- 规划模型输出 JSON，经解析后检查天数与日期、真实地点 ID、活动时间顺序、交通段连接、每日费用与总额；非法输出最多重试一次。
+- 逐日命令行输出保留地点 ID、坐标、来源和查询时间；无可用预报、未知费用与未知交通耗时明确标注。
 
-当前为本地单用户命令行原型。对话历史只存在内存中，长期记忆保存在 `data/memory.db`，该目录已被 Git 忽略。已支持最小 Web RAG；尚无向量数据库、embedding、本地知识库、LangChain、Web 界面或完整行程规划。多 provider 配置表示地址和密钥解析能力，不代表已逐一验证所有服务。
+当前为本地单用户命令行原型。对话历史只存在内存中，长期记忆保存在 `data/memory.db`，该目录已被 Git 忽略。规划先支持单目的地、短途多日；尚无地图展示、网页界面、真实预订或行程保存。多 provider 配置表示地址和密钥解析能力，不代表已逐一验证所有服务。
 
 ## 快速开始
 
@@ -47,6 +50,7 @@ LLM_TEMPERATURE=0.7
 AGENT_MAX_STEPS=5
 AGENT_MAX_HISTORY_MESSAGES=20
 TAVILY_API_KEY=填写自己的密钥
+AMAP_API_KEY=填写自己的高德 Web 服务 Key
 ```
 
 DeepSeek 专用密钥为空时，配置会回退读取 `OPENAI_API_KEY`。显式设置的 `OPENAI_BASE_URL` 优先于 provider 默认地址，切换服务商时应同步调整。`.env` 已加入忽略规则，不要提交真实凭证。
@@ -66,34 +70,53 @@ python main.py
 | `/forget 完整ID` | 删除指定记忆 |
 | `/memory-help` | 查看记忆命令帮助 |
 | `/history` | 查看当前对话消息 |
+| `/plan` | 逐项填写需求，生成结构化逐日行程 |
 | `/new` | 清空对话历史，保留长期记忆 |
 | `/quit` | 退出程序 |
 
 部分明确的自然语言列表请求，例如“我保存的长期记忆是什么？”，也会直接查询数据库。这是固定表达匹配，不是通用意图识别。未知斜杠命令返回帮助，不进入 Agent。
 
-记忆命令不调用模型；普通旅行请求进入 ReAct，可能调用模型和外部服务并产生费用。程序启动仍会初始化模型客户端，因此当前仍需可用的模型配置。模型客户端初始化不等于发起模型请求。
+记忆命令不调用模型；普通旅行请求进入 ReAct。`/plan` 按提示填写目的地和出发日期，并在旅行天数、结束日期中只填一项；人数默认 1，预算和偏好可留空。预算单位为人民币，口径是全程所有同行者合计。规划会调用外部服务和模型，可能产生费用。程序启动会初始化模型客户端，因此仍需可用的模型配置；初始化不等于发起模型请求。
 
 历史消息默认软上限为 20 条，可通过 `AGENT_MAX_HISTORY_MESSAGES` 调整。超限时删除最早的完整轮次，但保留当前轮次，因此不是严格的消息或 token 上限。
 
 ## 代码结构
 
 ```text
-main.py                    组装配置、客户端、工具和 Agent
-commands/memory_commands.py 直接记忆命令及固定表达分流
-memory/item.py             MemoryItem 记忆数据结构
-memory/sqlite_store.py     SQLite 存储、检索与维护
-agents/base.py             公共接口与历史管理
-agents/react_agent.py      ReAct 循环与文本 Action 解析
-core/config.py             AgentConfig、LLMConfig 与环境变量解析
-core/message.py            消息数据结构
-core/llm_client.py         消息转换与模型请求
-core/exceptions.py         LLMError
-tools/base.py              工具抽象基类
-tools/registry.py          注册、签名检查、描述、执行记录
-tools/weather_tool.py      天气函数及 WeatherTool 包装类
-tools/attraction_tool.py   景点搜索函数
-tools/memory_tool.py       供 Agent 调用的记忆工具
-prompts/system_prompt.md   含工具占位符的提示词模板
+main.py                         组装配置、客户端、工具和 Agent
+commands/
+  memory_commands.py            直接记忆命令及固定表达分流
+  trip_commands.py              规划请求的命令行输入
+  trip_output.py                逐日行程文本输出
+core/
+  config.py                     AgentConfig、LLMConfig 与环境变量解析
+  exceptions.py                 LLMError
+  itinerary_validator.py        模型 JSON 解析与行程校验
+  llm_client.py                 消息转换与模型请求
+  message.py                    消息数据结构
+  planning_context.py           规划模型的事实上下文
+  trip_input.py                 输入解析与默认值
+  trip_models.py                请求、地点、天气和行程数据结构
+  trip_planner.py               模型生成与有限重试
+  trip_sources.py               高德、天气和 Web RAG 资料获取
+memory/
+  item.py                       MemoryItem 记忆数据结构
+  sqlite_store.py               SQLite 存储、检索与维护
+agents/
+  base.py                       公共接口与历史管理
+  react_agent.py                ReAct 循环与文本 Action 解析
+tools/
+  base.py                       工具抽象基类
+  registry.py                   注册、签名检查、描述、执行记录
+  weather_tool.py               天气函数及 WeatherTool 包装类
+  attraction_tool.py            景点搜索函数
+  amap_place_tool.py            高德地点搜索
+  trip_weather_tool.py          wttr.in 逐日预报
+  memory_tool.py                供 Agent 调用的记忆工具
+prompts/
+  system_prompt.md              含工具占位符的提示词模板
+tests/
+  test_trip_flow.py             规划流程固定离线案例
 ```
 
 ## 如何验证
@@ -104,7 +127,13 @@ prompts/system_prompt.md   含工具占位符的提示词模板
 python -m compileall -q agents core tools memory commands main.py
 ```
 
-已用临时数据库和模拟模型进行离线验证，覆盖记忆增删改查、重新连接后读取、完整轮次裁剪、失败历史恢复，以及直接命令跳过模型。学习过程中用户报告真实模型保存和重启后检索通过；收尾未重新调用付费模型或外部服务。当前没有纳入仓库的正式自动化测试套件、量化成功率或延迟基准。
+规划固定案例运行：
+
+```powershell
+python -m unittest discover -s tests -p "test_trip_flow.py" -v
+```
+
+4 个离线案例覆盖正常两日流程、缺失目的地、地点工具失败和模型连续两次输出非法 JSON；语法检查也已通过。开发过程中还用模拟响应检查了天气覆盖范围、活动与交通顺序以及预算加总。真实 wttr.in 两日预报由 Codex 查询成功；项目作者报告真实高德地点查询及 `/plan` 完整流程运行成功，当前版本记录未保存该次输出供独立复核。尚无量化成功率或延迟基准。
 
 ## 当前限制
 
@@ -114,9 +143,12 @@ python -m compileall -q agents core tools memory commands main.py
 - 失败历史恢复仅覆盖 `LLMError` 和步数耗尽，不撤销数据库写入、工具请求、执行记录或费用。
 - 模型对记忆工具的写入行为依赖提示词，尚无独立的授权校验；执行记录中的 success 表示函数执行未抛异常，不保证业务成功。
 - 无多用户隔离、自动总结或 TTL 遗忘；依赖未锁版本，`Ctrl+C` 和输入结束的退出处理暂缓完善。
+- 规划校验检查结构及内部一致性，不证明活动开放时间、交通方式或费用估算的现实准确性；费用未知时总额保持未知，不能据此判断符合预算。
+- wttr.in 仅在返回的日期范围内提供预报；范围外显示暂无可用预报。缺少资料或外部服务失败时，规划给出错误或限制说明。
+- `/plan` 使用独立规划流程，普通 ReAct 对话的历史与记忆不会自动注入该流程；生成的行程尚不能保存、编辑或在地图上展示。
 
 ## 后续方向
 
-下一阶段可结合教材继续研究记忆检索、RAG、上下文工程、MCP、Agent 评估及 LangChain 对照实现。具体目标与顺序待讨论。其他 Agent 范式、向量数据库、知识图谱和多模态记忆不属于本版的必需功能。
+后续阶段计划增加本地前后端、地图展示、行程保存编辑及更系统的评测；以本地路线图和实际代码验收结果为准。
 
 参考材料包括 [旅行规划参考项目](https://github.com/nameless0120/helloagents-trip-planner)。参考项目中的功能不等于本仓库已实现的能力。
