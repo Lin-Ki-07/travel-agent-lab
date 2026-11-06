@@ -8,6 +8,8 @@ import sqlite3
 from core.llm_client import OpenAICompatibleClient
 from core.config import AgentConfig, LLMConfig
 from core.exceptions import LLMError
+from core.trip_planner import generate_itinerary
+from core.trip_sources import gather_trip_sources
 
 from tools.weather_tool import WeatherTool
 from tools.registry import ToolRegistry, ToolParameter
@@ -19,7 +21,8 @@ from agents.react_agent import ReActAgent
 from memory.sqlite_store import SQLiteMemoryStore
 
 from commands.memory_commands import handle_memory_command
-
+from commands.trip_commands import collect_trip_request
+from commands.trip_output import format_itinerary
 
 # 读取系统提示词
 with open("prompts/system_prompt.md", "r", encoding="utf-8") as f:
@@ -74,6 +77,7 @@ if __name__ == "__main__":
         "/memory-help：查看长期记忆命令；\n"
         "/new：开始新对话；\n"
         "/history：查看对话历史；\n"
+        "/plan：填写需求并生成逐日行程；\n"
         "/quit：退出。\n"
         "也可以直接和我对话。"
     )
@@ -100,6 +104,18 @@ if __name__ == "__main__":
             print("\n当前对话历史：")
             for message in agent.get_history():
                 print(message)
+            continue
+
+        if question == "/plan":
+            try:
+                request = collect_trip_request()
+                places, weather, evidence = gather_trip_sources(request)
+                trip = generate_itinerary(
+                    llm, request, places, weather, evidence
+                )
+                print(format_itinerary(trip))
+            except (ValueError, RuntimeError) as exc:
+                print(f"行程规划失败：{exc}")
             continue
 
         try:
