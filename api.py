@@ -16,6 +16,16 @@ app = FastAPI(title="Travel Agent Lab", version="0.4.0")
 
 generated_plans: dict[str, Itinerary] = {}
 
+def create_llm() -> OpenAICompatibleClient:
+    config = LLMConfig.from_env()
+    return OpenAICompatibleClient(
+        model=config.model,
+        api_key=config.api_key,
+        base_url=config.base_url,
+        timeout=config.timeout,
+        temperature=config.temperature,
+    )
+
 @app.post("/api/plans")
 def create_plan(raw_request: dict[str, str]) -> dict:
     try:
