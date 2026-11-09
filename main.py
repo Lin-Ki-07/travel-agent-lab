@@ -8,8 +8,7 @@ import sqlite3
 from core.llm_client import OpenAICompatibleClient
 from core.config import AgentConfig, LLMConfig
 from core.exceptions import LLMError
-from core.trip_planner import generate_itinerary
-from core.trip_sources import gather_trip_sources
+from core.trip_service import plan_trip
 
 from tools.weather_tool import WeatherTool
 from tools.registry import ToolRegistry, ToolParameter
@@ -109,10 +108,19 @@ if __name__ == "__main__":
         if question == "/plan":
             try:
                 request = collect_trip_request()
-                places, weather, evidence = gather_trip_sources(request)
-                trip = generate_itinerary(
-                    llm, request, places, weather, evidence
-                )
+                raw_request = {
+                    "destination": request.destination,
+                    "start_date": request.start_date.isoformat(),
+                    "days": str(request.days),
+                    "travelers": str(request.travelers),
+                    "budget_cny": (
+                        str(request.budget_cny)
+                        if request.budget_cny is not None
+                        else ""
+                    ),
+                    "preferences": ", ".join(request.preferences),
+                }
+                trip = plan_trip(llm, raw_request)
                 print(format_itinerary(trip))
             except (ValueError, RuntimeError) as exc:
                 print(f"行程规划失败：{exc}")
