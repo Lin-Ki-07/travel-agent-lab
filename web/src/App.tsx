@@ -4,8 +4,7 @@ import { getPlan, PlanApiError, savePlan, type CreatePlanResponse } from './api'
 import HistoryPanel from './HistoryPanel'
 import ItineraryView from './ItineraryView'
 import MapPanel from './MapPanel'
-import ReadPlanById from './ReadPlanById'
-import TripForm from './TripForm'
+import NewChatView from './NewChatView'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
@@ -96,8 +95,14 @@ export default function App() {
         )}
 
         {selected ? (
-          <>
-            <h2>{selected.itinerary.request.destination} 行程</h2>
+          <div className="new-chat">
+            <div className="chat-bubble user">
+              {selected.itinerary.request.destination} · {selected.itinerary.request.start_date} 起 ·{' '}
+              {selected.itinerary.request.days} 天 · {selected.itinerary.request.travelers} 人
+            </div>
+            <div className="chat-bubble assistant">
+              行程已生成。右侧可按天查看地图，下方为逐日安排。
+            </div>
             <div className="plan-toolbar">
               <p className="muted">
                 plan_id：{selected.plan_id}（{isSaved ? '已保存' : '未保存，仅本次进程内有效'}）
@@ -107,14 +112,13 @@ export default function App() {
               </button>
             </div>
             <ItineraryView itinerary={selected.itinerary} />
-          </>
+          </div>
         ) : (
-          <>
-            <h2>新聊天</h2>
-            <p className="muted">填写需求并生成，结果会成为左侧的一个对话。</p>
-            <TripForm onGenerated={handleGenerated} />
-            <ReadPlanById loading={loadingById} onLoad={handleLoadById} />
-          </>
+          <NewChatView
+            loadingById={loadingById}
+            onGenerated={handleGenerated}
+            onLoadById={handleLoadById}
+          />
         )}
       </main>
 

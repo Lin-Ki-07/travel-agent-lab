@@ -226,6 +226,83 @@ body {
   background: #8884;
 }
 
+.new-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-bubble {
+  max-width: 90%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.chat-bubble.user {
+  align-self: flex-end;
+  background: #2a71d3;
+  color: #fff;
+}
+
+.chat-bubble.assistant {
+  align-self: flex-start;
+  background: #8882;
+}
+
+.chat-card {
+  border: 1px solid #8885;
+  border-radius: 10px;
+  background: #8881;
+  padding: 10px 14px;
+}
+
+.chat-card summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.chat-card > .trip-form {
+  margin: 10px 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.composer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+  background: inherit;
+}
+
+.composer input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #8886;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.composer button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #2a71d3;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.composer button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .read-plan {
   margin-top: 16px;
   font-size: 0.9rem;
