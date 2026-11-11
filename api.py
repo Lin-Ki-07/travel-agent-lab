@@ -9,6 +9,7 @@ from core.config import LLMConfig
 from core.llm_client import OpenAICompatibleClient
 from core.trip_models import Itinerary
 from core.trip_service import plan_trip
+from core.trip_parser import parse_trip_text
 from core.map_view import build_map_days
 
 load_dotenv()
@@ -44,6 +45,17 @@ def create_plan(raw_request: dict[str, str]) -> dict:
         "itinerary": jsonable_encoder(asdict(itinerary)),
         "map_days": build_map_days(itinerary),
     }
+
+@app.post("/api/plans/parse")
+def parse_request(raw_request: dict[str, str]) -> dict:
+    """把一句自然语言需求解析为表单字段；只解析，不保存，不生成行程。"""
+    text = raw_request.get("text", "")
+    try:
+        return parse_trip_text(create_llm(), text)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 @app.post("/api/plans/{plan_id}/save")
 def save_plan(plan_id: str) -> dict:
