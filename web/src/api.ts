@@ -1,10 +1,10 @@
-// 与后端契约对接。规划请求与错误解析；map_days 在阶段 4 使用。
-import type { Itinerary } from './types'
+// 与后端契约对接。规划请求与错误解析。
+import type { Itinerary, MapDay } from './types'
 
 export interface CreatePlanResponse {
   plan_id: string
   itinerary: Itinerary
-  map_days: unknown[]
+  map_days: MapDay[]
 }
 
 export class PlanApiError extends Error {

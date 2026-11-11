@@ -54,6 +54,27 @@ export interface TripRequestData {
   preferences: string[]
 }
 
+// map_days：由后端 build_map_days 生成。position 与 positions 均为 [经度, 纬度]。
+export interface MapStop {
+  order: number
+  place_id: string
+  name: string
+  position: [number, number]
+}
+
+export interface MapLine {
+  kind: string
+  label: string
+  positions: [number, number][]
+}
+
+export interface MapDay {
+  day_number: number
+  plan_date: string
+  stops: MapStop[]
+  line: MapLine
+}
+
 export interface Itinerary {
   request: TripRequestData
   places: Place[]
