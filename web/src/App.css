@@ -205,6 +205,94 @@ body {
   font-size: 0.8rem;
 }
 
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+.history-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px;
+  margin-bottom: 6px;
+  border: 1px solid #8885;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-item.active {
+  border-color: #2a71d3;
+  background: #2a71d31a;
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid #8886;
+}
+
+.badge-saved {
+  border-color: #2a9d5c;
+  color: #2a9d5c;
+}
+
+.banner-success {
+  background: #2a9d5c1a;
+  border: 1px solid #2a9d5c40;
+}
+
+.plan-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.plan-toolbar p {
+  margin: 0;
+}
+
+.load-by-id {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+.load-by-id input {
+  padding: 6px 8px;
+  border: 1px solid #8886;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.plan-toolbar button,
+.load-by-id button {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: #2a71d3;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.plan-toolbar button:disabled,
+.load-by-id button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .trip-form button:disabled {
   opacity: 0.6;
   cursor: progress;
