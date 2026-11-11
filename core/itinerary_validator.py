@@ -1,4 +1,6 @@
 import json
+import logging
+import re
 from datetime import date, datetime, time
 
 from core.trip_models import (
@@ -11,6 +13,27 @@ from core.trip_models import (
     WeatherSnapshot,
 )
 
+logger = logging.getLogger(__name__)
+
+_FENCE_PATTERN = re.compile(r"^\s*```[A-Za-z0-9_-]*\s*\n?(.*?)\n?\s*```\s*$", re.DOTALL)
+
+
+def extract_json_text(raw: str) -> str:
+    """去掉模型常见的 Markdown 代码围栏，并截取最外层的 JSON 对象文本。
+
+    只做格式层面的清理，不修改 JSON 内容；内容是否合法仍由 json.loads 判断。
+    """
+    text = raw.strip()
+    fenced = _FENCE_PATTERN.match(text)
+    if fenced:
+        text = fenced.group(1).strip()
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end > start:
+        return text[start:end + 1]
+    return text
+
 
 def parse_itinerary(
     raw: str,
@@ -20,8 +43,10 @@ def parse_itinerary(
 ) -> Itinerary:
     """解析并校验模型返回的结构化 JSON。"""
     try:
-        data = json.loads(raw)
+        data = json.loads(extract_json_text(raw))
     except json.JSONDecodeError as exc:
+        # 记录原始输出的前若干字符，便于定位模型实际返回的格式；不记录密钥。
+        logger.warning("行程 JSON 解析失败，模型原始输出（截断）：%r", raw[:2000])
         raise ValueError("模型输出不是合法 JSON") from exc
 
     if not isinstance(data, dict):
