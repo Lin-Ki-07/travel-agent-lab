@@ -171,6 +171,18 @@ body {
   margin-bottom: 8px;
 }
 
+.map-overlay {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 12px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #111c;
+  color: #eee;
+}
+
 .map-canvas {
   width: 100%;
   height: 52vh;
@@ -269,6 +281,63 @@ body {
   padding: 0;
   border: none;
   background: transparent;
+}
+
+.chat-pane {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.chat-dock {
+  flex: none;
+  padding: 10px 16px 16px;
+  border-top: 1px solid #8882;
+}
+
+.composer-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 16px;
+  border: 1px solid #8886;
+  border-radius: 18px;
+  background: #8881;
+}
+
+.composer-box input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.composer-box button {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: #2a71d3;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.composer-box button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .composer {

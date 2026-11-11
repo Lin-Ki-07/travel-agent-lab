@@ -4,6 +4,7 @@ import { buildOverlaySpec, clampDayIndex } from './mapModel'
 import type { MapDay } from './types'
 
 interface MapPanelProps {
+  // 没有行程时传入空数组：地图仍显示（全国视野），但不绘制标记和示意线。
   days: MapDay[]
 }
 
@@ -12,6 +13,8 @@ type MapStatus =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'ready' }
+
+const DEFAULT_CENTER: [number, number] = [104.1, 35.9]
 
 export default function MapPanel({ days }: MapPanelProps) {
   const [dayIndex, setDayIndex] = useState(0)
@@ -24,9 +27,9 @@ export default function MapPanel({ days }: MapPanelProps) {
   const amapRef = useRef<AMapNamespace | null>(null)
 
   const safeIndex = clampDayIndex(dayIndex, days.length)
-  const currentDay = days[safeIndex]
+  const currentDay = days[safeIndex] as MapDay | undefined
 
-  // 初始化地图（只做一次）。
+  // 初始化地图（只做一次）。即使还没有行程，也先显示地图。
   useEffect(() => {
     const config = readAmapConfig()
     if (!config) return
@@ -37,7 +40,8 @@ export default function MapPanel({ days }: MapPanelProps) {
         if (cancelled || !containerRef.current) return
         amapRef.current = AMap
         mapRef.current = new AMap.Map(containerRef.current, {
-          zoom: 12,
+          zoom: 4,
+          center: DEFAULT_CENTER,
           viewMode: '2D',
         })
         setStatus({ kind: 'ready' })
@@ -57,13 +61,14 @@ export default function MapPanel({ days }: MapPanelProps) {
     }
   }, [])
 
-  // 切换日期或数据时重绘覆盖物。
+  // 切换日期或数据时重绘覆盖物；没有行程时只清空。
   useEffect(() => {
     const AMap = amapRef.current
     const map = mapRef.current
-    if (!AMap || !map || !currentDay) return
+    if (!AMap || !map) return
 
     map.clearMap()
+    if (!currentDay) return
 
     const spec = buildOverlaySpec(currentDay)
     const overlays: unknown[] = []
@@ -97,51 +102,58 @@ export default function MapPanel({ days }: MapPanelProps) {
     }
   }, [currentDay, status.kind])
 
-  if (days.length === 0) {
-    return <p className="muted">生成行程后，这里按日期显示地点与示意线。</p>
-  }
+  const overlayMessage =
+    status.kind === 'no-key'
+      ? '未配置高德 JS API Key，地图暂不显示。请在 web/.env.local 中填写 VITE_AMAP_JS_KEY 后重启开发服务器。'
+      : status.kind === 'error'
+        ? status.message
+        : status.kind === 'loading'
+          ? '地图加载中…'
+          : null
 
   return (
     <div className="map-panel">
-      <div className="day-tabs" role="tablist" aria-label="按日查看地图">
-        {days.map((day, index) => (
-          <button
-            key={day.day_number}
-            type="button"
-            role="tab"
-            aria-selected={index === safeIndex}
-            className={index === safeIndex ? 'day-tab active' : 'day-tab'}
-            onClick={() => setDayIndex(index)}
-          >
-            第 {day.day_number} 天
-          </button>
-        ))}
-      </div>
-
-      <p className="muted">{currentDay.plan_date}</p>
-
-      {status.kind === 'ready' || status.kind === 'loading' ? (
-        <div className="map-canvas-wrap">
-          <div ref={containerRef} className="map-canvas" aria-label="高德地图" />
-          {status.kind === 'loading' && <p className="muted">地图加载中…</p>}
-        </div>
-      ) : (
-        <div className="banner banner-pending" role="status">
-          {status.kind === 'no-key'
-            ? '未配置高德 JS API Key，地图暂不显示。请在 web/.env.local 中填写 VITE_AMAP_JS_KEY 后重启开发服务器。'
-            : status.message}
-        </div>
+      {days.length > 0 && (
+        <>
+          <div className="day-tabs" role="tablist" aria-label="按日查看地图">
+            {days.map((day, index) => (
+              <button
+                key={day.day_number}
+                type="button"
+                role="tab"
+                aria-selected={index === safeIndex}
+                className={index === safeIndex ? 'day-tab active' : 'day-tab'}
+                onClick={() => setDayIndex(index)}
+              >
+                第 {day.day_number} 天
+              </button>
+            ))}
+          </div>
+          {currentDay && <p className="muted">{currentDay.plan_date}</p>}
+        </>
       )}
 
-      <p className="line-note">{currentDay.line.label}</p>
+      <div className="map-canvas-wrap">
+        <div ref={containerRef} className="map-canvas" aria-label="高德地图" />
+        {overlayMessage && <p className="map-overlay muted">{overlayMessage}</p>}
+      </div>
 
-      <ol className="stop-list">
-        {currentDay.stops.map((stop) => (
-          <li key={`${stop.order}-${stop.place_id}`}>
-            <span className="stop-order">{stop.order}</span> {stop.name}
-          </li>
-        ))}
-      </ol>
+      {days.length === 0 ? (
+        <p className="muted">选择或生成一个行程后，这里按日期显示地点与示意线。</p>
+      ) : (
+        currentDay && (
+          <>
+            <p className="line-note">{currentDay.line.label}</p>
+            <ol className="stop-list">
+              {currentDay.stops.map((stop) => (
+                <li key={`${stop.order}-${stop.place_id}`}>
+                  <span className="stop-order">{stop.order}</span> {stop.name}
+                </li>
+              ))}
+            </ol>
+          </>
+        )
+      )}
     </div>
   )
 }
