@@ -1,8 +1,9 @@
-// 与后端契约对接。阶段 2 只实现规划请求与错误解析；地图字段在阶段 3/4 使用。
+// 与后端契约对接。规划请求与错误解析；map_days 在阶段 4 使用。
+import type { Itinerary } from './types'
 
 export interface CreatePlanResponse {
   plan_id: string
-  itinerary: unknown
+  itinerary: Itinerary
   map_days: unknown[]
 }
 
