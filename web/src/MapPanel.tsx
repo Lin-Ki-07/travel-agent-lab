@@ -25,6 +25,7 @@ export default function MapPanel({ days }: MapPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<AMapMap | null>(null)
   const amapRef = useRef<AMapNamespace | null>(null)
+  const resizeObserverRef = useRef<ResizeObserver | null>(null)
 
   const safeIndex = clampDayIndex(dayIndex, days.length)
   const currentDay = days[safeIndex] as MapDay | undefined
@@ -46,6 +47,12 @@ export default function MapPanel({ days }: MapPanelProps) {
         })
         setStatus({ kind: 'ready' })
       })
+      .then(() => {
+        // 三栏可拖动，容器尺寸会变化；高德默认只监听窗口变化，这里让地图跟随容器重新布局。
+        if (cancelled || !containerRef.current || typeof ResizeObserver === 'undefined') return
+        resizeObserverRef.current = new ResizeObserver(() => mapRef.current?.resize())
+        resizeObserverRef.current.observe(containerRef.current)
+      })
       .catch((error: unknown) => {
         if (cancelled) return
         setStatus({
@@ -56,6 +63,8 @@ export default function MapPanel({ days }: MapPanelProps) {
 
     return () => {
       cancelled = true
+      resizeObserverRef.current?.disconnect()
+      resizeObserverRef.current = null
       mapRef.current?.destroy()
       mapRef.current = null
     }

@@ -9,8 +9,31 @@ body {
 
 .layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) minmax(0, 1fr);
   height: 100vh;
+  /* 列宽由 App 通过内联样式控制（可拖动分隔条） */
+}
+
+.resize-handle {
+  cursor: col-resize;
+  background: transparent;
+  touch-action: none;
+  position: relative;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: #8884;
+  transition: background 0.15s;
+}
+
+.resize-handle:hover::after {
+  background: #2a71d3;
+  width: 2px;
 }
 
 .pane {

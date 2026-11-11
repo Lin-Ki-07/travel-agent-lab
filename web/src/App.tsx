@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import './App.css'
-import { getPlan, PlanApiError, savePlan, type CreatePlanResponse } from './api'
+import { PlanApiError, savePlan, type CreatePlanResponse } from './api'
 import ChatComposer from './ChatComposer'
 import HistoryPanel from './HistoryPanel'
 import ItineraryView from './ItineraryView'
 import MapPanel from './MapPanel'
 import NewChatView from './NewChatView'
+import ResizeHandle from './ResizeHandle'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
@@ -16,6 +17,16 @@ interface ChatMessage {
 
 const NEW_CHAT_KEY = '__new__'
 
+// 三栏宽度限制（像素）。中间栏为自适应剩余空间，并保证不小于 CENTER_MIN。
+const LEFT_MIN = 160
+const LEFT_MAX = 420
+const RIGHT_MIN = 240
+const RIGHT_MAX = 800
+const CENTER_MIN = 320
+const HANDLE_WIDTH = 6
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+
 // 一个对话对应一个行程。selectedId 为 null 时显示“新聊天”。
 // 所有状态只在当前页面内存中，刷新页面或重启后端都会失效；不做编辑、账号或跨重启持久化。
 export default function App() {
@@ -23,12 +34,14 @@ export default function App() {
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [loadingById, setLoadingById] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [draft, setDraft] = useState('')
   // 每个对话各自保存消息，切换对话时不串内容。
   const [messagesByChat, setMessagesByChat] = useState<Record<string, ChatMessage[]>>({})
+  const [leftWidth, setLeftWidth] = useState(240)
+  const [rightWidth, setRightWidth] = useState(420)
+  const widthsAtDragStart = useRef({ left: 240, right: 420 })
 
   const selected = plans.find((plan) => plan.plan_id === selectedId) ?? null
   const isSaved = selected !== null && savedIds.has(selected.plan_id)
@@ -86,24 +99,24 @@ export default function App() {
     }
   }
 
-  async function handleLoadById(planId: string) {
-    setLoadingById(true)
-    setNotice(null)
-    try {
-      const plan = await getPlan(planId)
-      // 后端只允许读取已保存的行程，因此读取成功即表示已保存。
-      setSavedIds((prev) => new Set(prev).add(plan.plan_id))
-      upsertPlan(plan)
-      setNotice({ kind: 'success', text: '已读取已保存的行程。' })
-    } catch (error) {
-      setNotice({ kind: 'error', text: errorText(error, '读取失败，请稍后重试。') })
-    } finally {
-      setLoadingById(false)
-    }
+  function beginDrag() {
+    widthsAtDragStart.current = { left: leftWidth, right: rightWidth }
   }
 
+  // 左分隔条：向右拖动增加左栏宽度。
+  function dragLeft(dx: number) {
+    setLeftWidth(clamp(widthsAtDragStart.current.left + dx, LEFT_MIN, LEFT_MAX))
+  }
+
+  // 右分隔条：向左拖动增加地图栏宽度。
+  function dragRight(dx: number) {
+    setRightWidth(clamp(widthsAtDragStart.current.right - dx, RIGHT_MIN, RIGHT_MAX))
+  }
+
+  const gridColumns = `${leftWidth}px ${HANDLE_WIDTH}px minmax(${CENTER_MIN}px, 1fr) ${HANDLE_WIDTH}px ${rightWidth}px`
+
   return (
-    <div className="layout">
+    <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
       <aside className="pane pane-history" aria-label="对话列表">
         <HistoryPanel
           plans={plans}
@@ -113,6 +126,8 @@ export default function App() {
           onNewChat={handleNewChat}
         />
       </aside>
+
+      <ResizeHandle label="调整左栏宽度" onDragStart={beginDrag} onDrag={dragLeft} />
 
       <main className="pane chat-pane" aria-label="对话">
         <div className="chat-scroll">
@@ -148,9 +163,7 @@ export default function App() {
             <NewChatView
               formOpen={formOpen}
               onFormOpenChange={setFormOpen}
-              loadingById={loadingById}
               onGenerated={handleGenerated}
-              onLoadById={handleLoadById}
             />
           )}
 
@@ -165,6 +178,8 @@ export default function App() {
           <ChatComposer draft={draft} onDraftChange={setDraft} onSend={handleSend} />
         </div>
       </main>
+
+      <ResizeHandle label="调整地图栏宽度" onDragStart={beginDrag} onDrag={dragRight} />
 
       <section className="pane pane-map" aria-label="地图">
         <h2>地图</h2>

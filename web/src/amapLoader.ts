@@ -6,6 +6,7 @@ export interface AMapMap {
   remove(overlays: unknown[]): void
   clearMap(): void
   setFitView(overlays?: unknown[], immediately?: boolean, margins?: number[]): void
+  resize(): void
   destroy(): void
 }
 
