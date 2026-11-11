@@ -1,7 +1,12 @@
+import { useState } from 'react'
 import './App.css'
+import type { CreatePlanResponse } from './api'
+import TripForm from './TripForm'
 
-// 阶段 1：三栏骨架。表单、行程、地图和历史记录在后续阶段实现。
+// 阶段 2：表单与生成状态。行程展示（阶段 3）、地图（阶段 4）、历史与保存（阶段 5）在后续实现。
 export default function App() {
+  const [lastResult, setLastResult] = useState<CreatePlanResponse | null>(null)
+
   return (
     <div className="layout">
       <aside className="pane pane-history" aria-label="历史记录">
@@ -11,7 +16,15 @@ export default function App() {
 
       <main className="pane pane-chat" aria-label="对话">
         <h2>Travel Agent Lab</h2>
-        <p className="muted">请在下方填写需求，生成逐日行程。</p>
+        <p className="muted">填写需求后生成逐日行程。</p>
+        <TripForm onGenerated={setLastResult} />
+        {lastResult && (
+          <div className="card" role="status">
+            <h3>行程已生成</h3>
+            <p className="muted">plan_id：{lastResult.plan_id}</p>
+            <p className="muted">逐日展示将在阶段 3 实现。</p>
+          </div>
+        )}
       </main>
 
       <section className="pane pane-map" aria-label="地图">
