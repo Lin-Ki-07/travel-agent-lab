@@ -1,32 +1,66 @@
-# React + TypeScript + Vite
+# Travel Agent Lab · 本地前端（v0.4.0）
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + TypeScript + Vite 实现的本地单用户界面，对接仓库根目录的 FastAPI 后端。页面分三栏：左侧历史记录，中间需求表单与逐日行程，右侧高德地图。
 
-Currently, two official plugins are available:
+## 运行前准备
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. **后端**：在仓库根目录安装依赖（参见根目录 README），然后启动 FastAPI：
 
-## React Compiler
+   ```powershell
+   python -m uvicorn api:app --host 127.0.0.1 --port 8000
+   ```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+   Windows 上若 `python3` 不可用，请使用 `python`。后端需要根目录 `.env` 中的模型与高德 Web 服务 Key，这些密钥不要复制到前端。
 
-## Expanding the Oxlint configuration
+2. **前端依赖**：在 `web/` 目录安装一次：
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+   ```powershell
+   cd web
+   npm install
+   ```
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+3. **高德 JS API Key**（仅地图需要）：在高德开放平台为本项目申请 **Web端（JS API）** 类型的 Key，并把域名白名单设为 `localhost` 和 `127.0.0.1`。然后在 `web/` 下创建 `.env.local`：
+
+   ```dotenv
+   VITE_AMAP_JS_KEY=你的JS Key
+   # 仅当控制台启用了安全密钥时填写：
+   VITE_AMAP_SECURITY_CODE=安全密钥
+   ```
+
+   `.env.local` 已被 Git 忽略，请不要把真实 Key 写入 `.env.example` 或其他会提交的文件。不配置时，页面仍可用，地图区域会显示提示，地点顺序以文字列出。
+
+## 启动
+
+```powershell
+cd web
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+浏览器打开 `http://127.0.0.1:5173`。开发服务器把 `/api` 转发到 `127.0.0.1:8000`，因此不需要修改后端的 CORS 设置。
+
+修改 `.env.local` 后需要**重启** `npm run dev`，Vite 只在启动时读取环境变量。
+
+## 使用
+
+1. 在中间栏填写目的地、出发日期、天数**或**结束日期（二选一）；人数、预算、偏好可留空。
+2. 点击“生成行程”。生成期间按钮禁用并显示进度提示；后端返回的 422 / 502 错误会显示在表单上方。
+3. 生成后，中间栏按日显示活动时间、地点、交通段、天气（无预报时标注“暂无可用预报”）和费用（未知时标注“费用未知”）。
+4. 右侧地图按天切换。编号标记按行程顺序排列，虚线为**地点顺序示意线，并非实际道路路线**，页面会显示该说明。
+5. 点击“保存当前行程”后，行程被标记为已保存；可在左侧历史中选择，或在输入框中粘贴 plan_id 读取已保存的行程。
+
+## 边界
+
+- 保存与读取只在**当前后端进程的内存**中有效。重启后端后，旧 plan_id 会返回 404。
+- 本版没有编辑、删除、账号或跨重启持久化。
+- 示意线不表示实际路线、耗时或距离；前端不计算这些信息。
+
+## 检查
+
+```powershell
+cd web
+npx tsc -b         # 类型检查
+npm run build      # 生产构建
+npm run lint       # oxlint
+```
+
+目前仓库没有前端自动化测试套件。逻辑测试是在开发时用 Node 直接运行的临时脚本，不在仓库中。浏览器内的交互（地图渲染、表单点击）需要手动检查。
