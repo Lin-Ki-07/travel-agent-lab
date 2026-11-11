@@ -12,6 +12,13 @@ export interface SavePlanResponse {
   saved: boolean
 }
 
+export interface ParseRequestResponse {
+  fields: Record<string, string>
+  missing: string[]
+  issues: string[]
+  summary: string
+}
+
 export class PlanApiError extends Error {
   readonly status: number | null
 
@@ -74,6 +81,15 @@ export function createPlan(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  })
+}
+
+// 把一句自然语言需求解析为表单字段；只解析，不保存，不生成行程。
+export function parseRequest(text: string, baseUrl = ''): Promise<ParseRequestResponse> {
+  return requestJson<ParseRequestResponse>(`${baseUrl}/api/plans/parse`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
   })
 }
 

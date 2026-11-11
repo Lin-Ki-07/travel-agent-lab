@@ -12,6 +12,46 @@ export interface TripFormValues {
   preferences: string
 }
 
+// 解析接口返回的字段（均为字符串）转为表单状态；天数与结束日期只保留一项作为模式。
+export function fromParsedFields(fields: Record<string, string>): TripFormValues {
+  const endDate = fields.end_date ?? ''
+  return {
+    destination: fields.destination ?? '',
+    start_date: fields.start_date ?? '',
+    durationMode: endDate && !fields.days ? 'end_date' : 'days',
+    days: fields.days ?? '',
+    end_date: endDate,
+    travelers: fields.travelers ?? '',
+    budget_cny: fields.budget_cny ?? '',
+    preferences: fields.preferences ?? '',
+  }
+}
+
+const MISSING_LABELS: Record<string, string> = {
+  destination: '目的地',
+  start_date: '出发日期',
+  days: '旅行天数或结束日期',
+}
+
+// 解析结果的助手回复：说明识别出的内容、缺失项和需要检查的问题。
+export function formatParseReply(result: {
+  summary: string
+  missing: string[]
+  issues: string[]
+}): string {
+  const parts = [`已识别：${result.summary}。`]
+  if (result.missing.length > 0) {
+    parts.push(`还需要补充：${result.missing.map((key) => MISSING_LABELS[key] ?? key).join('、')}。`)
+  }
+  if (result.issues.length > 0) {
+    parts.push(`请检查：${result.issues.join('；')}。`)
+  }
+  if (result.missing.length === 0 && result.issues.length === 0) {
+    parts.push('请确认表单内容后点击“生成行程”。')
+  }
+  return parts.join('')
+}
+
 export const emptyTripForm: TripFormValues = {
   destination: '',
   start_date: '',

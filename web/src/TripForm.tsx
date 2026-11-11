@@ -10,10 +10,12 @@ import {
 
 interface TripFormProps {
   onGenerated: (result: CreatePlanResponse) => void
+  // 初始值由父组件提供（例如自然语言解析的结果）；变化时父组件应通过 key 重新挂载表单。
+  initialValues?: TripFormValues
 }
 
-export default function TripForm({ onGenerated }: TripFormProps) {
-  const [values, setValues] = useState<TripFormValues>(emptyTripForm)
+export default function TripForm({ onGenerated, initialValues }: TripFormProps) {
+  const [values, setValues] = useState<TripFormValues>(initialValues ?? emptyTripForm)
   const [errors, setErrors] = useState<TripFormErrors>({})
   const [loading, setLoading] = useState(false)
   const [apiError, setApiError] = useState<PlanApiError | null>(null)

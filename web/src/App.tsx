@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react'
 import './App.css'
-import { PlanApiError, savePlan, type CreatePlanResponse } from './api'
+import { parseRequest, PlanApiError, savePlan, type CreatePlanResponse } from './api'
 import ChatComposer from './ChatComposer'
 import HistoryPanel from './HistoryPanel'
 import ItineraryView from './ItineraryView'
 import MapPanel from './MapPanel'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
+import { formatParseReply, fromParsedFields, type TripFormValues } from './tripRequest'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
@@ -37,6 +38,10 @@ export default function App() {
   const [notice, setNotice] = useState<Notice>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [draft, setDraft] = useState('')
+  const [parsing, setParsing] = useState(false)
+  // 自然语言解析结果填入表单；每次解析递增 formKey，使表单以新值重新挂载。
+  const [prefill, setPrefill] = useState<TripFormValues | null>(null)
+  const [formKey, setFormKey] = useState(0)
   // 每个对话各自保存消息，切换对话时不串内容。
   const [messagesByChat, setMessagesByChat] = useState<Record<string, ChatMessage[]>>({})
   const [leftWidth, setLeftWidth] = useState(240)
@@ -68,20 +73,42 @@ export default function App() {
     setSelectedId(planId)
   }
 
-  function handleSend(text: string) {
+  function appendMessages(key: string, added: ChatMessage[]) {
+    setMessagesByChat((prev) => ({ ...prev, [key]: [...(prev[key] ?? []), ...added] }))
+  }
+
+  async function handleSend(text: string) {
     setDraft('')
-    const reply = selected
-      ? '这是已生成的行程。要规划新的行程，请点击左侧“＋ 新聊天”。'
-      : '直接用文字规划暂未接入后端。我已为你展开“旅行需求”表单，请在表单中填写后生成。'
-    setMessagesByChat((prev) => ({
-      ...prev,
-      [chatKey]: [
-        ...(prev[chatKey] ?? []),
+
+    // 已生成的行程页面：不再解析，只提示如何开始新的规划。
+    if (selected) {
+      appendMessages(chatKey, [
         { role: 'user', text },
-        { role: 'assistant', text: reply },
-      ],
-    }))
-    if (!selected) setFormOpen(true)
+        { role: 'assistant', text: '这是已生成的行程。要规划新的行程，请点击左侧“＋ 新聊天”。' },
+      ])
+      return
+    }
+
+    // 新聊天：调用后端解析需求，结果填入表单，由用户确认后再生成。
+    appendMessages(NEW_CHAT_KEY, [{ role: 'user', text }])
+    setParsing(true)
+    try {
+      const result = await parseRequest(text)
+      setPrefill(fromParsedFields(result.fields))
+      setFormKey((key) => key + 1)
+      setFormOpen(true)
+      appendMessages(NEW_CHAT_KEY, [{ role: 'assistant', text: formatParseReply(result) }])
+    } catch (error) {
+      setFormOpen(true)
+      appendMessages(NEW_CHAT_KEY, [
+        {
+          role: 'assistant',
+          text: `需求解析失败：${errorText(error, '请稍后重试。')} 你可以直接在表单中填写。`,
+        },
+      ])
+    } finally {
+      setParsing(false)
+    }
   }
 
   async function handleSave() {
@@ -163,6 +190,8 @@ export default function App() {
             <NewChatView
               formOpen={formOpen}
               onFormOpenChange={setFormOpen}
+              prefill={prefill}
+              formKey={formKey}
               onGenerated={handleGenerated}
             />
           )}
@@ -175,7 +204,13 @@ export default function App() {
         </div>
 
         <div className="chat-dock">
-          <ChatComposer draft={draft} onDraftChange={setDraft} onSend={handleSend} />
+          <ChatComposer
+            draft={draft}
+            onDraftChange={setDraft}
+            onSend={handleSend}
+            disabled={parsing}
+            placeholder={parsing ? '正在解析需求…' : undefined}
+          />
         </div>
       </main>
 
