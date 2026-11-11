@@ -18,7 +18,26 @@ budget_cny、preferences。前端传字符串，与现有 parse_trip_request
     "daily_plans": [],
     "estimated_total_cny": null,
     "generated_at": "含时区的 ISO 8601 时间"
-  }
+  },
+  "map_days": [
+    {
+      "day_number": 1,
+      "plan_date": "YYYY-MM-DD",
+      "stops": [
+        {
+          "order": 1,
+          "place_id": "高德地点 ID",
+          "name": "地点名称",
+          "position": [120.15, 30.25]
+        }
+      ],
+      "line": {
+        "kind": "place_order_schematic",
+        "label": "地点顺序示意线，非实际道路路线",
+        "positions": [[120.15, 30.25]]
+      }
+    }
+  ]
 }
 
 itinerary 由现有规划与校验流程生成。places 保留高德 place_id、
@@ -27,6 +46,8 @@ daily_plans 保留日期、按顺序排列的 activities、transport_segments、
 weather 和费用字段。地图按每天 activities 的顺序，通过 place_id
 关联 places；相邻不同地点的坐标连线标注为“地点顺序示意线”，
 不代表实际道路路线。
+position 和 line.positions 中的坐标顺序均为 [经度, 纬度]；
+按 stops.order 绘制标记，按 line.positions 绘制折线，并显示 line.label。
 
 生成成功后的行程暂存在当前服务进程内，但尚未标记为“已保存”。
 
@@ -39,7 +60,8 @@ weather 和费用字段。地图按每天 activities 的顺序，通过 place_id
 ## GET /api/plans/{plan_id}
 
 仅能读取已保存的行程。成功：200，返回与规划接口相同的
-plan_id 和 itinerary 结构。未知或未保存的 ID 返回 404。
+plan_id、itinerary 和 map_days 结构；map_days 与规划时相同。
+未知或未保存的 ID 返回 404。
 
 ## 错误
 
