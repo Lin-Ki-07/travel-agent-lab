@@ -9,6 +9,7 @@ from core.config import LLMConfig
 from core.llm_client import OpenAICompatibleClient
 from core.trip_models import Itinerary
 from core.trip_service import plan_trip
+from core.map_view import build_map_days
 
 load_dotenv()
 
@@ -41,6 +42,7 @@ def create_plan(raw_request: dict[str, str]) -> dict:
     return {
         "plan_id": plan_id,
         "itinerary": jsonable_encoder(asdict(itinerary)),
+        "map_days": build_map_days(itinerary),
     }
 
 @app.post("/api/plans/{plan_id}/save")
@@ -61,4 +63,5 @@ def get_plan(plan_id: str) -> dict:
     return {
         "plan_id": plan_id,
         "itinerary": jsonable_encoder(asdict(itinerary)),
+        "map_days": build_map_days(itinerary),
     }
