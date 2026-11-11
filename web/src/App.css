@@ -205,10 +205,45 @@ body {
   font-size: 0.8rem;
 }
 
-.history-heading {
-  font-size: 0.8rem;
-  opacity: 0.6;
-  margin: 4px 8px 6px;
+.new-chat-button {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid #8885;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.new-chat-button:hover {
+  background: #8882;
+}
+
+.new-chat-button.active {
+  background: #8884;
+}
+
+.read-plan {
+  margin-top: 16px;
+  font-size: 0.9rem;
+}
+
+.read-plan-toggle {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  opacity: 0.8;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.read-plan .load-by-id {
+  margin-top: 8px;
 }
 
 .history-empty {

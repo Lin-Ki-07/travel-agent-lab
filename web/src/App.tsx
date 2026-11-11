@@ -4,18 +4,19 @@ import { getPlan, PlanApiError, savePlan, type CreatePlanResponse } from './api'
 import HistoryPanel from './HistoryPanel'
 import ItineraryView from './ItineraryView'
 import MapPanel from './MapPanel'
+import ReadPlanById from './ReadPlanById'
 import TripForm from './TripForm'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
-// 阶段 5：表单 + 逐日行程 + 地图 + 历史记录 + 保存与按 plan_id 读取。
+// 一个对话对应一个行程。selectedId 为 null 时显示“新聊天”（表单）。
 // 所有状态只在当前页面内存中，刷新页面或重启后端都会失效；不做编辑、账号或跨重启持久化。
 export default function App() {
   const [plans, setPlans] = useState<CreatePlanResponse[]>([])
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [loadingById, setLoadingById] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
 
   const selected = plans.find((plan) => plan.plan_id === selectedId) ?? null
@@ -24,6 +25,11 @@ export default function App() {
   function upsertPlan(plan: CreatePlanResponse) {
     setPlans((prev) => [plan, ...prev.filter((item) => item.plan_id !== plan.plan_id)])
     setSelectedId(plan.plan_id)
+  }
+
+  function handleNewChat() {
+    setNotice(null)
+    setSelectedId(null)
   }
 
   function handleGenerated(result: CreatePlanResponse) {
@@ -52,7 +58,7 @@ export default function App() {
   }
 
   async function handleLoadById(planId: string) {
-    setLoadingId(planId)
+    setLoadingById(true)
     setNotice(null)
     try {
       const plan = await getPlan(planId)
@@ -63,29 +69,23 @@ export default function App() {
     } catch (error) {
       setNotice({ kind: 'error', text: errorText(error, '读取失败，请稍后重试。') })
     } finally {
-      setLoadingId(null)
+      setLoadingById(false)
     }
   }
 
   return (
     <div className="layout">
-      <aside className="pane pane-history" aria-label="历史记录">
-        <h2>历史记录</h2>
+      <aside className="pane pane-history" aria-label="对话列表">
         <HistoryPanel
           plans={plans}
           savedIds={savedIds}
           selectedId={selectedId}
-          loadingId={loadingId}
           onSelect={handleSelect}
-          onLoadById={handleLoadById}
+          onNewChat={handleNewChat}
         />
       </aside>
 
       <main className="pane pane-chat" aria-label="对话">
-        <h2>Travel Agent Lab</h2>
-        <p className="muted">填写需求后生成逐日行程。</p>
-        <TripForm onGenerated={handleGenerated} />
-
         {notice && (
           <div
             className={notice.kind === 'error' ? 'banner banner-error' : 'banner banner-success'}
@@ -95,8 +95,9 @@ export default function App() {
           </div>
         )}
 
-        {selected && (
+        {selected ? (
           <>
+            <h2>{selected.itinerary.request.destination} 行程</h2>
             <div className="plan-toolbar">
               <p className="muted">
                 plan_id：{selected.plan_id}（{isSaved ? '已保存' : '未保存，仅本次进程内有效'}）
@@ -107,6 +108,13 @@ export default function App() {
             </div>
             <ItineraryView itinerary={selected.itinerary} />
           </>
+        ) : (
+          <>
+            <h2>新聊天</h2>
+            <p className="muted">填写需求并生成，结果会成为左侧的一个对话。</p>
+            <TripForm onGenerated={handleGenerated} />
+            <ReadPlanById loading={loadingById} onLoad={handleLoadById} />
+          </>
         )}
       </main>
 
@@ -115,7 +123,7 @@ export default function App() {
         {selected ? (
           <MapPanel key={selected.plan_id} days={selected.map_days} />
         ) : (
-          <p className="muted">生成或读取行程后，这里按日期显示地点与示意线。</p>
+          <p className="muted">生成或选择一个行程后，这里按日期显示地点与示意线。</p>
         )}
       </section>
     </div>
