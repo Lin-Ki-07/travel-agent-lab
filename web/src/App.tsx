@@ -104,6 +104,16 @@ export default function App() {
     setSelectedId(planId)
   }
 
+  function handleRename(chatId: string, title: string) {
+    const trimmedTitle = title.trim()
+    if (!trimmedTitle) return
+
+    updateChat(chatId, {
+      title: trimmedTitle,
+      titleSource: 'manual',
+    })
+  }
+
   function appendMessages(key: string, added: ChatMessage[]) {
     setChats((prev) => prev.map((chat) => chat.id === key
       ? { ...chat, messages: [...chat.messages, ...added] }
@@ -187,6 +197,7 @@ export default function App() {
           selectedId={selectedId}
           onSelect={handleSelect}
           onNewChat={handleNewChat}
+          onRename={handleRename}
         />
       </aside>
 
