@@ -1,7 +1,7 @@
 import type { CreatePlanResponse } from './api'
 
 interface HistoryPanelProps {
-  plans: CreatePlanResponse[]
+  chats: { id: string; plan: CreatePlanResponse | null }[]
   savedIds: ReadonlySet<string>
   selectedId: string | null
   onSelect: (planId: string) => void
@@ -10,7 +10,7 @@ interface HistoryPanelProps {
 
 // 参考 Codex 侧栏：顶部“新聊天”，下方每一项是一个行程对话，点击即进入。
 export default function HistoryPanel({
-  plans,
+  chats,
   savedIds,
   selectedId,
   onSelect,
@@ -26,25 +26,26 @@ export default function HistoryPanel({
         ＋ 新聊天
       </button>
 
-      {plans.length === 0 ? (
-        <p className="muted history-empty">还没有行程。在右侧表单生成后会出现在这里。</p>
+      {chats.length === 0 ? (
+        <p className="muted history-empty">还没有对话。点击“＋ 新聊天”开始。</p>
       ) : (
         <ul className="history-list">
-          {plans.map((plan) => {
-            const { request } = plan.itinerary
-            const selected = plan.plan_id === selectedId
-            const saved = savedIds.has(plan.plan_id)
+          {chats.map((chat) => {
+            const request = chat.plan?.itinerary.request
+            const selected = chat.id === selectedId
+            const saved = chat.plan !== null && savedIds.has(chat.plan.plan_id)
+            const title = request ? `${request.destination} · ${request.days} 天` : '新聊天'
             return (
-              <li key={plan.plan_id}>
+              <li key={chat.id}>
                 <button
                   type="button"
                   className={selected ? 'history-row active' : 'history-row'}
-                  onClick={() => onSelect(plan.plan_id)}
+                  onClick={() => onSelect(chat.id)}
                   aria-current={selected ? 'true' : undefined}
-                  title={`${request.destination} · ${request.start_date} · ${request.days} 天`}
+                  title={request ? `${request.destination} · ${request.start_date} · ${request.days} 天` : title}
                 >
                   <span className="history-title">
-                    {request.destination} · {request.days} 天
+                    {title}
                   </span>
                   {saved && <span className="saved-dot" aria-label="已保存" title="已保存" />}
                 </button>
