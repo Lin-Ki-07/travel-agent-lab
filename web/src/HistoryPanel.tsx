@@ -1,7 +1,7 @@
 import type { CreatePlanResponse } from './api'
 
 interface HistoryPanelProps {
-  chats: { id: string; plan: CreatePlanResponse | null }[]
+  chats: { id: string; title: string; plan: CreatePlanResponse | null }[]
   savedIds: ReadonlySet<string>
   selectedId: string | null
   onSelect: (planId: string) => void
@@ -31,10 +31,9 @@ export default function HistoryPanel({
       ) : (
         <ul className="history-list">
           {chats.map((chat) => {
-            const request = chat.plan?.itinerary.request
             const selected = chat.id === selectedId
             const saved = chat.plan !== null && savedIds.has(chat.plan.plan_id)
-            const title = request ? `${request.destination} · ${request.days} 天` : '新聊天'
+            const title = chat.title
             return (
               <li key={chat.id}>
                 <button
@@ -42,7 +41,7 @@ export default function HistoryPanel({
                   className={selected ? 'history-row active' : 'history-row'}
                   onClick={() => onSelect(chat.id)}
                   aria-current={selected ? 'true' : undefined}
-                  title={request ? `${request.destination} · ${request.start_date} · ${request.days} 天` : title}
+                  title={title}
                 >
                   <span className="history-title">
                     {title}

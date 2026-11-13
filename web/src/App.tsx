@@ -18,6 +18,8 @@ interface ChatMessage {
 
 interface Chat {
   id: string
+  title: string
+  titleSource: 'auto' | 'manual'
   plan: CreatePlanResponse | null
   messages: ChatMessage[]
   draft: string
@@ -28,8 +30,10 @@ interface Chat {
 }
 
 function createChat(): Chat {
-  return {
+  return{
     id: crypto.randomUUID(),
+    title: '新的旅游规划',
+    titleSource: 'auto',
     plan: null,
     messages: [],
     draft: '',
@@ -66,7 +70,22 @@ export default function App() {
   const selected = currentChat.plan
   const isSaved = selected !== null && savedIds.has(selected.plan_id)
   function updateChat(id: string, changes: Partial<Chat>) {
-    setChats((prev) => prev.map((chat) => chat.id === id ? { ...chat, ...changes } : chat))
+    setChats((prev) =>
+      prev.map((chat) => {
+        if (chat.id !== id) return chat
+
+        const next = { ...chat, ...changes }
+        const destination =
+          changes.plan?.itinerary.request.destination ??
+          changes.prefill?.destination
+
+        if (next.titleSource === 'auto' && destination?.trim()) {
+          next.title = `${destination.trim()}旅游攻略`
+        }
+
+        return next
+      }),
+    )
   }
 
   function handleNewChat() {
