@@ -2,3 +2,5 @@ requests
 tavily-python
 openai
 python-dotenv
+fastapi
+uvicorn
