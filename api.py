@@ -16,6 +16,16 @@ load_dotenv()
 
 app = FastAPI(title="Travel Agent Lab", version="0.4.0")
 
+@app.get("/")
+def service_info() -> dict[str, str]:
+    """提供本地后端入口说明，不调用模型或外部服务。"""
+    return {
+        "service": "Travel Agent Lab API",
+        "message": "后端服务已启动，请在前端页面使用旅行规划功能。",
+        "docs": "/docs",
+        "frontend": "http://127.0.0.1:5173",
+    }
+
 generated_plans: dict[str, Itinerary] = {}
 saved_plan_ids: set[str] = set()
 
