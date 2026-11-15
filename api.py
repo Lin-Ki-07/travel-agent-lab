@@ -10,6 +10,7 @@ from core.llm_client import OpenAICompatibleClient
 from core.trip_models import Itinerary
 from core.trip_service import plan_trip
 from core.trip_parser import parse_trip_text
+from core.trip_store import load_itinerary, save_itinerary
 from core.map_view import build_map_days
 
 load_dotenv()
@@ -27,7 +28,6 @@ def service_info() -> dict[str, str]:
     }
 
 generated_plans: dict[str, Itinerary] = {}
-saved_plan_ids: set[str] = set()
 
 def create_llm() -> OpenAICompatibleClient:
     config = LLMConfig.from_env()
@@ -69,19 +69,20 @@ def parse_request(raw_request: dict[str, str]) -> dict:
 
 @app.post("/api/plans/{plan_id}/save")
 def save_plan(plan_id: str) -> dict:
-    if plan_id not in generated_plans:
+    itinerary = generated_plans.get(plan_id)
+    if itinerary is None:
         raise HTTPException(status_code=404, detail="行程不存在")
 
-    saved_plan_ids.add(plan_id)
+    save_itinerary(plan_id, itinerary)
     return {"plan_id": plan_id, "saved": True}
 
 
 @app.get("/api/plans/{plan_id}")
 def get_plan(plan_id: str) -> dict:
-    if plan_id not in saved_plan_ids:
+    itinerary = load_itinerary(plan_id)
+    if itinerary is None:
         raise HTTPException(status_code=404, detail="行程不存在或尚未保存")
 
-    itinerary = generated_plans[plan_id]
     return {
         "plan_id": plan_id,
         "itinerary": jsonable_encoder(asdict(itinerary)),
