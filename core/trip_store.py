@@ -140,3 +140,22 @@ def list_saved_plans(db_path: Path = DB_PATH) -> list[dict]:
             "saved_at": saved_at,
         })
     return plans
+
+
+def update_itinerary(
+    plan_id: str,
+    itinerary: Itinerary,
+    db_path: Path = DB_PATH,
+) -> bool:
+    payload = json.dumps(jsonable_encoder(asdict(itinerary)), ensure_ascii=False)
+    now = datetime.now().astimezone().isoformat()
+
+    with closing(_connect(db_path)) as connection:
+        with connection:
+            cursor = connection.execute(
+                "UPDATE saved_plans "
+                "SET itinerary_json = ?, updated_at = ? "
+                "WHERE plan_id = ? AND schema_version = ?",
+                (payload, now, plan_id, SCHEMA_VERSION),
+            )
+            return cursor.rowcount == 1

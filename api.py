@@ -6,11 +6,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 
 from core.config import LLMConfig
+from core.trip_edit import edit_day
 from core.llm_client import OpenAICompatibleClient
 from core.trip_models import Itinerary
 from core.trip_service import plan_trip
 from core.trip_parser import parse_trip_text
-from core.trip_store import list_saved_plans, load_itinerary, save_itinerary
+from core.trip_store import (
+    list_saved_plans, load_itinerary, save_itinerary, update_itinerary,
+)
 from core.map_view import build_map_days
 
 load_dotenv()
@@ -91,4 +94,25 @@ def get_plan(plan_id: str) -> dict:
         "plan_id": plan_id,
         "itinerary": jsonable_encoder(asdict(itinerary)),
         "map_days": build_map_days(itinerary),
+    }
+
+
+@app.put("/api/plans/{plan_id}/days/{day_number}")
+def update_plan_day(plan_id: str, day_number: int, raw: dict) -> dict:
+    itinerary = load_itinerary(plan_id)
+    if itinerary is None:
+        raise HTTPException(status_code=404, detail="已保存行程不存在")
+
+    try:
+        edited = edit_day(itinerary, day_number, raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if not update_itinerary(plan_id, edited):
+        raise HTTPException(status_code=404, detail="已保存行程不存在")
+
+    return {
+        "plan_id": plan_id,
+        "itinerary": jsonable_encoder(asdict(edited)),
+        "map_days": build_map_days(edited),
     }
