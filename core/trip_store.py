@@ -116,3 +116,27 @@ def load_itinerary(
         validated,
         generated_at=datetime.fromisoformat(data["generated_at"]),
     )
+
+def list_saved_plans(db_path: Path = DB_PATH) -> list[dict]:
+    with closing(_connect(db_path)) as connection:
+        rows = connection.execute(
+            "SELECT plan_id, schema_version, itinerary_json, saved_at "
+            "FROM saved_plans ORDER BY saved_at DESC, plan_id DESC"
+        ).fetchall()
+
+    plans = []
+    for plan_id, version, raw, saved_at in rows:
+        if version != SCHEMA_VERSION:
+            raise ValueError(f"不支持的行程数据版本：{version}")
+
+        data = json.loads(raw)
+        request = data["request"]
+        plans.append({
+            "plan_id": plan_id,
+            "destination": request["destination"],
+            "start_date": request["start_date"],
+            "days": request["days"],
+            "generated_at": data["generated_at"],
+            "saved_at": saved_at,
+        })
+    return plans

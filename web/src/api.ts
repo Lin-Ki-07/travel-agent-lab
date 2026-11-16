@@ -1,6 +1,7 @@
 // 与后端契约对接：规划、保存、按 plan_id 读取，以及统一的错误解析。
 import type { Itinerary, MapDay } from './types'
 
+
 export interface CreatePlanResponse {
   plan_id: string
   itinerary: Itinerary

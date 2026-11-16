@@ -10,7 +10,7 @@ from core.llm_client import OpenAICompatibleClient
 from core.trip_models import Itinerary
 from core.trip_service import plan_trip
 from core.trip_parser import parse_trip_text
-from core.trip_store import load_itinerary, save_itinerary
+from core.trip_store import list_saved_plans, load_itinerary, save_itinerary
 from core.map_view import build_map_days
 
 load_dotenv()
@@ -66,6 +66,10 @@ def parse_request(raw_request: dict[str, str]) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+@app.get("/api/plans")
+def get_saved_plans() -> dict:
+    return {"plans": list_saved_plans()}
 
 @app.post("/api/plans/{plan_id}/save")
 def save_plan(plan_id: str) -> dict:
