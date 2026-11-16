@@ -34,6 +34,38 @@ def extract_json_text(raw: str) -> str:
         return text[start:end + 1]
     return text
 
+def validate_itinerary(itinerary: Itinerary) -> Itinerary:
+    """校验完整行程中跨对象的地点、时间与交通关系。"""
+    place_ids = {place.place_id for place in itinerary.places}
+
+    for day in itinerary.daily_plans:
+        for activity in day.activities:
+            if activity.place_id not in place_ids:
+                raise ValueError(f"活动引用了未查询到的地点：{activity.place_id}")
+
+        for previous, current in zip(day.activities, day.activities[1:]):
+            if current.start_time < previous.start_time:
+                raise ValueError(f"第 {day.day_number} 天活动未按开始时间排序")
+            if current.start_time < previous.end_time:
+                raise ValueError(f"第 {day.day_number} 天活动时间重叠")
+
+        for segment in day.transport_segments:
+            if segment.from_place_id not in place_ids or segment.to_place_id not in place_ids:
+                raise ValueError("交通段引用了未查询到的地点")
+
+        expected_routes = [
+            (previous.place_id, current.place_id)
+            for previous, current in zip(day.activities, day.activities[1:])
+            if previous.place_id != current.place_id
+        ]
+        actual_routes = [
+            (segment.from_place_id, segment.to_place_id)
+            for segment in day.transport_segments
+        ]
+        if actual_routes != expected_routes:
+            raise ValueError(f"第 {day.day_number} 天交通段必须按活动地点顺序连接")
+
+    return itinerary
 
 def parse_itinerary(
     raw: str,
@@ -56,7 +88,6 @@ def parse_itinerary(
     if not isinstance(daily_data, list):
         raise ValueError("缺少 daily_plans 列表")
 
-    place_map = {place.place_id: place for place in places}
     weather_map = {item.forecast_date: item for item in weather}
     daily_plans: list[DailyPlan] = []
 
@@ -88,15 +119,7 @@ def parse_itinerary(
             except (KeyError, TypeError, ValueError) as exc:
                 raise ValueError(f"第 {index} 天存在非法活动") from exc
 
-            if place_id not in place_map:
-                raise ValueError(f"活动引用了未查询到的地点：{place_id}")
             activities.append(activity)
-
-        for previous, current in zip(activities, activities[1:]):
-            if current.start_time < previous.start_time:
-                raise ValueError(f"第 {index} 天活动未按开始时间排序")
-            if current.start_time < previous.end_time:
-                raise ValueError(f"第 {index} 天活动时间重叠")
 
         transport_segments: list[TransportSegment] = []
         for transport_data in item.get("transport_segments", []):
@@ -110,24 +133,7 @@ def parse_itinerary(
             except (KeyError, TypeError, ValueError) as exc:
                 raise ValueError(f"第 {index} 天存在非法交通段") from exc
 
-            if (
-                segment.from_place_id not in place_map
-                or segment.to_place_id not in place_map
-            ):
-                raise ValueError(f"交通段引用了未查询到的地点")
             transport_segments.append(segment)
-
-        expected_routes = [
-            (previous.place_id, current.place_id)
-            for previous, current in zip(activities, activities[1:])
-            if previous.place_id != current.place_id
-        ]
-        actual_routes = [
-            (segment.from_place_id, segment.to_place_id)
-            for segment in transport_segments
-        ]
-        if actual_routes != expected_routes:
-            raise ValueError(f"第 {index} 天交通段必须按活动地点顺序连接")
 
         try:
             daily_plans.append(
@@ -154,10 +160,10 @@ def parse_itinerary(
     ):
         raise ValueError("estimated_total_cny 必须是整数或 null")
 
-    return Itinerary(
+    return validate_itinerary(Itinerary(
         request=request,
         places=places,
         daily_plans=daily_plans,
         estimated_total_cny=estimated_total_cny,
         generated_at=datetime.now().astimezone(),
-    )
+    ))
