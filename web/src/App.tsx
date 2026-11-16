@@ -1,6 +1,14 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
-import { parseRequest, PlanApiError, savePlan, type CreatePlanResponse } from './api'
+import {
+  getPlan,
+  listSavedPlans,
+  parseRequest,
+  PlanApiError,
+  savePlan,
+  type CreatePlanResponse,
+  type SavedPlanSummary,
+} from './api'
 import ChatComposer from './ChatComposer'
 import HistoryPanel from './HistoryPanel'
 import ItineraryView from './ItineraryView'
@@ -55,10 +63,12 @@ const HANDLE_WIDTH = 6
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
 // 对话先拥有独立 ID，生成行程后再关联后端 plan_id。
-// 所有状态只在当前页面内存中，刷新页面或重启后端都会失效；不做编辑、账号或跨重启持久化。
+// 聊天状态只在当前页面内存中；刷新后只从后端恢复已保存行程。
 export default function App() {
   const [chats, setChats] = useState<Chat[]>(() => [createChat()])
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set())
+  const [savedPlans, setSavedPlans] = useState<SavedPlanSummary[]>([])
+  const [openingPlanId, setOpeningPlanId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState(chats[0].id)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
@@ -69,6 +79,26 @@ export default function App() {
   const currentChat = chats.find((chat) => chat.id === selectedId)!
   const selected = currentChat.plan
   const isSaved = selected !== null && savedIds.has(selected.plan_id)
+  useEffect(() => {
+    let cancelled = false
+
+    listSavedPlans()
+      .then((result) => {
+        if (!cancelled) setSavedPlans(result.plans)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setNotice({
+            kind: 'error',
+            text: `读取已保存行程列表失败：${errorText(error, '请稍后刷新页面。')}`,
+          })
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
   function updateChat(id: string, changes: Partial<Chat>) {
     setChats((prev) =>
       prev.map((chat) => {
@@ -102,6 +132,36 @@ export default function App() {
   function handleSelect(planId: string) {
     setNotice(null)
     setSelectedId(planId)
+  }
+
+  async function handleOpenSaved(planId: string) {
+    if (openingPlanId !== null) return
+
+    setOpeningPlanId(planId)
+    setNotice(null)
+    try {
+      const result = await getPlan(planId)
+      const existing = chats.find((chat) => chat.plan?.plan_id === planId)
+
+      if (existing) {
+        updateChat(existing.id, { plan: result })
+        setSelectedId(existing.id)
+      } else {
+        const chat = createChat()
+        chat.plan = result
+        chat.title = `${result.itinerary.request.destination}旅游攻略`
+        setChats((prev) => [chat, ...prev])
+        setSelectedId(chat.id)
+      }
+      setSavedIds((prev) => new Set(prev).add(planId))
+    } catch (error) {
+      setNotice({
+        kind: 'error',
+        text: `重新打开行程失败：${errorText(error, '请稍后重试。')}`,
+      })
+    } finally {
+      setOpeningPlanId(null)
+    }
   }
 
   function handleRename(chatId: string, title: string) {
@@ -164,7 +224,13 @@ export default function App() {
     try {
       await savePlan(selected.plan_id)
       setSavedIds((prev) => new Set(prev).add(selected.plan_id))
-      setNotice({ kind: 'success', text: '已保存。重启后端后该行程将无法再读取。' })
+      setNotice({ kind: 'success', text: '行程已保存；刷新页面后可在左侧重新打开。' })
+      try {
+        const result = await listSavedPlans()
+        setSavedPlans(result.plans)
+      } catch {
+        setNotice({ kind: 'success', text: '行程已保存；列表暂未刷新，可刷新页面后重新打开。' })
+      }
     } catch (error) {
       setNotice({ kind: 'error', text: errorText(error, '保存失败，请稍后重试。') })
     } finally {
@@ -194,11 +260,16 @@ export default function App() {
         <HistoryPanel
           chats={chats}
           savedIds={savedIds}
+          savedPlans={savedPlans}
           selectedId={selectedId}
           onSelect={handleSelect}
+          onOpenSaved={handleOpenSaved}
           onNewChat={handleNewChat}
           onRename={handleRename}
         />
+        <p className="muted history-note">
+          仅已保存行程可在刷新后重新打开；聊天消息、草稿和手动标题不会恢复。
+        </p>
       </aside>
 
       <ResizeHandle label="调整左栏宽度" onDragStart={beginDrag} onDrag={dragLeft} />
@@ -225,7 +296,7 @@ export default function App() {
               </div>
               <div className="plan-toolbar">
                 <p className="muted">
-                  plan_id：{selected.plan_id}（{isSaved ? '已保存' : '未保存，仅本次进程内有效'}）
+                  plan_id：{selected.plan_id}（{isSaved ? '已保存' : '未保存，刷新页面后无法重新打开'}）
                 </p>
                 <button type="button" onClick={handleSave} disabled={saving || isSaved}>
                   {isSaved ? '已保存' : saving ? '保存中…' : '保存当前行程'}

@@ -13,6 +13,19 @@ export interface SavePlanResponse {
   saved: boolean
 }
 
+export interface SavedPlanSummary {
+  plan_id: string
+  destination: string
+  start_date: string
+  days: number
+  generated_at: string
+  saved_at: string
+}
+
+export interface SavedPlansResponse {
+  plans: SavedPlanSummary[]
+}
+
 export interface ParseRequestResponse {
   fields: Record<string, string>
   missing: string[]
@@ -108,4 +121,10 @@ export function getPlan(planId: string, baseUrl = ''): Promise<CreatePlanRespons
     `${baseUrl}/api/plans/${encodeURIComponent(planId)}`,
     { method: 'GET' },
   )
+}
+
+export function listSavedPlans(baseUrl = ''): Promise<SavedPlansResponse> {
+  return requestJson<SavedPlansResponse>(`${baseUrl}/api/plans`, {
+    method: 'GET',
+  })
 }

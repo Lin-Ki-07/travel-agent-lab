@@ -598,3 +598,8 @@ body {
 .chat-context-menu > button:focus-visible {
   background: #8883;
 }
+
+.history-section-title {
+  margin: 12px 10px 6px;
+  font-weight: 600;
+}
