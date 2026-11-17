@@ -1,4 +1,4 @@
-# v0.4.0 本地 API 契约
+# v0.5.0 本地 API 契约
 
 仅供本地单用户使用。请求和响应均为 JSON，日期使用 YYYY-MM-DD，
 响应中的活动时间由 jsonable_encoder 输出为 HH:MM:SS（当前业务输入使用分钟精度），
@@ -64,7 +64,8 @@ budget_cny、preferences。前端传字符串，与现有 parse_trip_request
     "places": [],
     "daily_plans": [],
     "estimated_total_cny": null,
-    "generated_at": "含时区的 ISO 8601 时间"
+    "generated_at": "含时区的 ISO 8601 时间",
+    "web_evidence": "本次检索的编号、标题、URL 和摘要；旧行程可能为空"
   },
   "map_days": [
     {
@@ -98,18 +99,45 @@ position 和 line.positions 中的坐标顺序均为 [经度, 纬度]；
 按 stops.order 绘制标记，按 line.positions 绘制折线，并显示 line.label。
 
 生成成功后的行程暂存在当前服务进程内，但尚未标记为“已保存”。
+本次 `preferences` 留空时采用本地默认偏好；显式填写时以本次值为准。
 
 ## POST /api/plans/{plan_id}/save
 
 无请求体。成功：200，返回 {"plan_id": "...", "saved": true}。
-仅将当前进程中已生成且通过校验的行程标记为已保存；
-不接收客户端回传的行程内容，不提供修改。
+将当前进程中已生成且通过校验的行程写入独立的 `data/trips.db`；
+不接收客户端回传的行程内容。重复保存同一 ID 不创建副本。
+
+## GET /api/plans
+
+返回 `{"plans":[...]}`，只列出已保存行程的摘要。每项含 plan_id、destination、
+start_date、days、generated_at、saved_at，按保存时间倒序排列。
 
 ## GET /api/plans/{plan_id}
 
 仅能读取已保存的行程。成功：200，返回与规划接口相同的
-plan_id、itinerary 和 map_days 结构；map_days 与规划时相同。
+plan_id、itinerary 和 map_days 结构；map_days 从读取的行程重新派生。
 未知或未保存的 ID 返回 404。
+
+## PUT /api/plans/{plan_id}/days/{day_number}
+
+只编辑已保存行程的某一天。请求提供当天完整的 `activities` 和 `transport_segments`：
+
+```json
+{
+  "activities": [{"place_id":"已有地点 ID","description":"参观","start_time":"09:00","end_time":"10:00"}],
+  "transport_segments": []
+}
+```
+
+地点必须来自该行程已有 `places`；活动时间不得重叠；相邻活动换地点时交通段必须按顺序连接。
+成功返回更新后的 itinerary 和 map_days；无效内容返回 422 且原行程不变，未知行程返回 404。
+编辑不查询新资料或调用模型；当天及总费用置为未知，旧天气、地点和网页资料仍为快照。
+
+## GET /api/preferences、PUT /api/preferences
+
+GET 返回 `{"preferences":["美食"]}`，未设置时为空列表。PUT 请求同一结构，
+空列表可清除；最多 20 项，每项去除首尾空白后为 1–100 个字符。无效输入返回 422。
+默认偏好与行程中本次实际采用的偏好分别保存，修改默认值不改写旧行程。
 
 ## 错误
 
@@ -121,15 +149,16 @@ plan_id、itinerary 和 map_days 结构；map_days 与规划时相同。
 
 ## 保存边界
 
-保存只在当前后端进程的内存中有效；重启后读取旧 ID 返回 404。
-本版没有编辑、删除、账号、跨进程同步或跨重启持久化。
-v0.5.0 再设计持久化与编辑。
+已保存行程跨后端重启有效，未保存生成结果仅在当前进程暂存。
+数据库位于被 Git 忽略的 `data/trips.db`，与 CLI 记忆数据库分开；记录含 `schema_version=1`。
+本版没有删除、账号或多用户隔离。
 
-网页聊天标题、消息和草稿与后端行程分开，只保留在页面内存中。左侧聊天切换不调用
-GET 读取接口，刷新页面会失去聊天列表；重启后端不主动清除前端已有快照。
+网页聊天标题、消息和草稿只保留在页面内存中。刷新后可通过列表与 GET 重新打开已保存行程，
+不会恢复完整聊天或未保存草稿；重启后端不主动清除页面已有快照。
 
 ## 验证状态
 
-开发中用临时 TestClient 模拟脚本验证了规划成功、422/502、未保存与未知 ID 的 404、
-保存后读取一致及 map_days 顺序。真实服务上的生成、保存、读取和重启失效联合验收暂缓。
+29 个离线 unittest 通过。真实浏览器案例已完成生成、保存、后端重启、刷新后重新打开和编辑地点；
+后端 GET 读回首站“九峰公园”，地图首站及六项顺序与行程一致。编辑后活动描述仍写着原先的室内展馆，
+用户选择暂不处理。没有自动化浏览器测试或量化效果评测。
 Swagger UI 可以手动复现接口调用；执行解析或规划接口会产生真实外部调用和潜在费用。
