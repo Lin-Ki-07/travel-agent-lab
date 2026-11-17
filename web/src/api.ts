@@ -1,5 +1,5 @@
 // 与后端契约对接：规划、保存、按 plan_id 读取，以及统一的错误解析。
-import type { Itinerary, MapDay } from './types'
+import type { Activity, Itinerary, MapDay, TransportSegment } from './types'
 
 
 export interface CreatePlanResponse {
@@ -127,4 +127,25 @@ export function listSavedPlans(baseUrl = ''): Promise<SavedPlansResponse> {
   return requestJson<SavedPlansResponse>(`${baseUrl}/api/plans`, {
     method: 'GET',
   })
+}
+
+export interface EditDayRequest {
+  activities: Activity[]
+  transport_segments: TransportSegment[]
+}
+
+export function updatePlanDay(
+  planId: string,
+  dayNumber: number,
+  body: EditDayRequest,
+  baseUrl = '',
+): Promise<CreatePlanResponse> {
+  return requestJson<CreatePlanResponse>(
+    `${baseUrl}/api/plans/${encodeURIComponent(planId)}/days/${dayNumber}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
 }

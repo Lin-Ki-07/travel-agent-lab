@@ -6,7 +6,9 @@ import {
   parseRequest,
   PlanApiError,
   savePlan,
+  updatePlanDay,
   type CreatePlanResponse,
+  type EditDayRequest,
   type SavedPlanSummary,
 } from './api'
 import ChatComposer from './ChatComposer'
@@ -71,6 +73,7 @@ export default function App() {
   const [openingPlanId, setOpeningPlanId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState(chats[0].id)
   const [saving, setSaving] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [leftWidth, setLeftWidth] = useState(240)
   const [rightWidth, setRightWidth] = useState(420)
@@ -238,6 +241,23 @@ export default function App() {
     }
   }
 
+  async function handleEditDay(dayNumber: number, body: EditDayRequest) {
+    if (!selected || !isSaved || savingEdit) return
+
+    setSavingEdit(true)
+    setNotice(null)
+    try {
+      const updated = await updatePlanDay(selected.plan_id, dayNumber, body)
+      updateChat(currentChat.id, { plan: updated })
+      setNotice({ kind: 'success', text: `第 ${dayNumber} 天已更新，地图已同步。` })
+    } catch (error) {
+      setNotice({ kind: 'error', text: errorText(error, '编辑失败，原行程已保留。') })
+      throw error
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   function beginDrag() {
     widthsAtDragStart.current = { left: leftWidth, right: rightWidth }
   }
@@ -302,7 +322,12 @@ export default function App() {
                   {isSaved ? '已保存' : saving ? '保存中…' : '保存当前行程'}
                 </button>
               </div>
-              <ItineraryView itinerary={selected.itinerary} />
+              <ItineraryView
+                itinerary={selected.itinerary}
+                editable={isSaved}
+                savingEdit={savingEdit}
+                onEditDay={handleEditDay}
+              />
             </div>
           ) : null}
 

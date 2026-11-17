@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import DayEditor from './DayEditor'
+import type { EditDayRequest } from './api'
 import type { Itinerary } from './types'
 import {
   budgetStatus,
@@ -11,9 +14,15 @@ import {
 
 interface ItineraryViewProps {
   itinerary: Itinerary
+  editable: boolean
+  savingEdit: boolean
+  onEditDay: (dayNumber: number, body: EditDayRequest) => Promise<void>
 }
 
-export default function ItineraryView({ itinerary }: ItineraryViewProps) {
+export default function ItineraryView({
+  itinerary, editable, savingEdit, onEditDay,
+}: ItineraryViewProps) {
+  const [editingDay, setEditingDay] = useState<number | null>(null)
   const { places, daily_plans: days } = itinerary
 
   return (
@@ -49,6 +58,27 @@ export default function ItineraryView({ itinerary }: ItineraryViewProps) {
             天气快照：{formatWeather(day.weather)}
             （来源：{day.weather.source}；查询时间：{day.weather.queried_at}）
           </p>
+          {editable && (
+            <button
+              type="button"
+              onClick={() => setEditingDay(day.day_number)}
+              disabled={savingEdit}
+            >
+              编辑当天
+            </button>
+          )}
+          {editingDay === day.day_number && (
+            <DayEditor
+              day={day}
+              places={places}
+              disabled={savingEdit}
+              onCancel={() => setEditingDay(null)}
+              onSubmit={async (dayNumber, body) => {
+                await onEditDay(dayNumber, body)
+                setEditingDay(null)
+              }}
+            />
+          )}
           <ol className="activity-list">
             {day.activities.map((activity, index) => (
               <li key={`${activity.place_id}-${index}`}>

@@ -603,3 +603,37 @@ body {
   margin: 12px 10px 6px;
   font-weight: 600;
 }
+
+.day-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #8885;
+  border-radius: 8px;
+}
+
+.day-editor-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.day-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.day-editor input,
+.day-editor select {
+  padding: 6px;
+  font: inherit;
+}
+
+.day-editor-actions {
+  display: flex;
+  gap: 8px;
+}
