@@ -81,4 +81,5 @@ export interface Itinerary {
   daily_plans: DailyPlan[]
   estimated_total_cny: number | null
   generated_at: string
+  web_evidence?: string
 }

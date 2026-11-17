@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import DayEditor from './DayEditor'
+import EvidenceView from './EvidenceView'
 import type { EditDayRequest } from './api'
 import type { Itinerary } from './types'
 import {
@@ -55,6 +56,8 @@ export default function ItineraryView({
           重新打开不会自动更新；出行前请核对最新信息。
         </p>
       </div>
+
+      <EvidenceView evidence={itinerary.web_evidence ?? ''} />
 
       {days.map((day) => (
         <section className="card day-card" key={day.day_number}>

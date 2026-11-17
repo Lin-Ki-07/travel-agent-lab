@@ -667,3 +667,21 @@ body {
   font: inherit;
   cursor: pointer;
 }
+
+.evidence-card summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.evidence-list {
+  padding-left: 20px;
+}
+
+.evidence-list li {
+  overflow-wrap: anywhere;
+  margin-top: 10px;
+}
+
+.evidence-list p {
+  margin: 4px 0;
+}
