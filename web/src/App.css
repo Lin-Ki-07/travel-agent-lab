@@ -598,3 +598,90 @@ body {
 .chat-context-menu > button:focus-visible {
   background: #8883;
 }
+
+.history-section-title {
+  margin: 12px 10px 6px;
+  font-weight: 600;
+}
+
+.day-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #8885;
+  border-radius: 8px;
+}
+
+.day-editor-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.day-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.day-editor input,
+.day-editor select {
+  padding: 6px;
+  font: inherit;
+}
+
+.day-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.preferences-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 12px 10px;
+  border-top: 1px solid #8884;
+}
+
+.preferences-editor input {
+  padding: 6px 8px;
+  border: 1px solid #8886;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.preferences-editor p {
+  margin: 0;
+}
+
+.preferences-actions button {
+  padding: 6px 10px;
+  border: 1px solid #8886;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.evidence-card summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.evidence-list {
+  padding-left: 20px;
+}
+
+.evidence-list li {
+  overflow-wrap: anywhere;
+  margin-top: 10px;
+}
+
+.evidence-list p {
+  margin: 4px 0;
+}

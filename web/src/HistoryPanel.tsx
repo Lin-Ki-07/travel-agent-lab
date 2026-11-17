@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { CreatePlanResponse } from './api'
+import type { CreatePlanResponse, SavedPlanSummary } from './api'
 
 interface HistoryPanelProps {
   chats: { id: string; title: string; plan: CreatePlanResponse | null }[]
@@ -8,6 +8,8 @@ interface HistoryPanelProps {
   onSelect: (chatId: string) => void
   onNewChat: () => void
   onRename: (chatId: string, title: string) => void
+  savedPlans: SavedPlanSummary[]
+  onOpenSaved: (planId: string) => void
 }
 
 interface ContextMenu {
@@ -19,8 +21,10 @@ interface ContextMenu {
 export default function HistoryPanel({
   chats,
   savedIds,
+  savedPlans,
   selectedId,
   onSelect,
+  onOpenSaved,
   onNewChat,
   onRename,
 }: HistoryPanelProps) {
@@ -54,6 +58,30 @@ export default function HistoryPanel({
       >
         ＋ 新聊天
       </button>
+
+      <p className="muted history-section-title">已保存行程</p>
+      {savedPlans.length === 0 ? (
+        <p className="muted history-empty">暂无已保存行程。</p>
+      ) : (
+        <ul className="history-list">
+          {savedPlans.map((plan) => (
+            <li key={plan.plan_id}>
+              <button
+                type="button"
+                className="history-row"
+                onClick={() => onOpenSaved(plan.plan_id)}
+                title={`${plan.destination} · ${plan.start_date} 起 ${plan.days} 天`}
+              >
+                <span className="history-title">
+                  {plan.destination}旅游攻略 · {plan.start_date}
+                </span>
+                <span className="saved-dot" aria-label="已保存" title="已保存" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="muted history-section-title">当前页面聊天</p>
 
       {chats.length === 0 ? (
         <p className="muted history-empty">

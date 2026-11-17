@@ -6,10 +6,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 
 from core.config import LLMConfig
+from core.trip_edit import edit_day
 from core.llm_client import OpenAICompatibleClient
 from core.trip_models import Itinerary
 from core.trip_service import plan_trip
 from core.trip_parser import parse_trip_text
+from core.trip_store import (
+    list_saved_plans, load_itinerary, load_preferences, save_itinerary,
+    save_preferences, update_itinerary,
+)
 from core.map_view import build_map_days
 
 load_dotenv()
@@ -27,7 +32,6 @@ def service_info() -> dict[str, str]:
     }
 
 generated_plans: dict[str, Itinerary] = {}
-saved_plan_ids: set[str] = set()
 
 def create_llm() -> OpenAICompatibleClient:
     config = LLMConfig.from_env()
@@ -42,7 +46,10 @@ def create_llm() -> OpenAICompatibleClient:
 @app.post("/api/plans")
 def create_plan(raw_request: dict[str, str]) -> dict:
     try:
-        itinerary = plan_trip(create_llm(), raw_request)
+        effective_request = dict(raw_request)
+        if not effective_request.get("preferences", "").strip():
+            effective_request["preferences"] = ",".join(load_preferences())
+        itinerary = plan_trip(create_llm(), effective_request)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -67,23 +74,67 @@ def parse_request(raw_request: dict[str, str]) -> dict:
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+
+@app.get("/api/preferences")
+def get_preferences() -> dict:
+    return {"preferences": load_preferences()}
+
+
+@app.put("/api/preferences")
+def put_preferences(raw: dict) -> dict:
+    preferences = raw.get("preferences")
+    if not isinstance(preferences, list) or any(
+        not isinstance(item, str) for item in preferences
+    ):
+        raise HTTPException(status_code=422, detail="preferences 必须是字符串列表")
+    try:
+        return {"preferences": save_preferences(preferences)}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+@app.get("/api/plans")
+def get_saved_plans() -> dict:
+    return {"plans": list_saved_plans()}
+
 @app.post("/api/plans/{plan_id}/save")
 def save_plan(plan_id: str) -> dict:
-    if plan_id not in generated_plans:
+    itinerary = generated_plans.get(plan_id)
+    if itinerary is None:
         raise HTTPException(status_code=404, detail="行程不存在")
 
-    saved_plan_ids.add(plan_id)
+    save_itinerary(plan_id, itinerary)
     return {"plan_id": plan_id, "saved": True}
 
 
 @app.get("/api/plans/{plan_id}")
 def get_plan(plan_id: str) -> dict:
-    if plan_id not in saved_plan_ids:
+    itinerary = load_itinerary(plan_id)
+    if itinerary is None:
         raise HTTPException(status_code=404, detail="行程不存在或尚未保存")
 
-    itinerary = generated_plans[plan_id]
     return {
         "plan_id": plan_id,
         "itinerary": jsonable_encoder(asdict(itinerary)),
         "map_days": build_map_days(itinerary),
+    }
+
+
+@app.put("/api/plans/{plan_id}/days/{day_number}")
+def update_plan_day(plan_id: str, day_number: int, raw: dict) -> dict:
+    itinerary = load_itinerary(plan_id)
+    if itinerary is None:
+        raise HTTPException(status_code=404, detail="已保存行程不存在")
+
+    try:
+        edited = edit_day(itinerary, day_number, raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if not update_itinerary(plan_id, edited):
+        raise HTTPException(status_code=404, detail="已保存行程不存在")
+
+    return {
+        "plan_id": plan_id,
+        "itinerary": jsonable_encoder(asdict(edited)),
+        "map_days": build_map_days(edited),
     }

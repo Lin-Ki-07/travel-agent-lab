@@ -144,6 +144,7 @@ class Itinerary:
     daily_plans: list[DailyPlan]
     estimated_total_cny: int | None
     generated_at: datetime
+    web_evidence: str = ""
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:
