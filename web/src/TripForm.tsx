@@ -10,11 +10,15 @@ import {
 
 interface TripFormProps {
   onGenerated: (result: CreatePlanResponse) => void
+  defaultPreferences: string[]
+  preferencesLoaded: boolean
   // 初始值由父组件提供（例如自然语言解析的结果）；变化时父组件应通过 key 重新挂载表单。
   initialValues?: TripFormValues
 }
 
-export default function TripForm({ onGenerated, initialValues }: TripFormProps) {
+export default function TripForm({
+  onGenerated, initialValues, defaultPreferences, preferencesLoaded,
+}: TripFormProps) {
   const [values, setValues] = useState<TripFormValues>(initialValues ?? emptyTripForm)
   const [errors, setErrors] = useState<TripFormErrors>({})
   const [loading, setLoading] = useState(false)
@@ -150,6 +154,15 @@ export default function TripForm({ onGenerated, initialValues }: TripFormProps) 
           onChange={(e) => update('preferences', e.target.value)}
           placeholder="用逗号分隔，例如：美食,博物馆"
         />
+        <span className="muted">
+          {values.preferences.trim()
+            ? '本次使用表单填写的偏好，不采用默认偏好。'
+            : preferencesLoaded
+              ? defaultPreferences.length
+                ? `本次留空将使用默认偏好：${defaultPreferences.join('、')}`
+                : '本次留空且未设置默认偏好。'
+              : '正在读取默认偏好；读取失败时请明确填写本次偏好。'}
+        </span>
       </label>
 
       {apiError && (

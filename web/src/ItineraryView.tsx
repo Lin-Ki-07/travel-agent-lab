@@ -34,6 +34,11 @@ export default function ItineraryView({
           {itinerary.request.travelers} 人
         </p>
         <p>{budgetStatus(itinerary)}</p>
+        <p className="muted">
+          本次规划采用的偏好：{itinerary.request.preferences.length
+            ? itinerary.request.preferences.join('、')
+            : '未设置'}
+        </p>
         <p className="muted">生成时间：{itinerary.generated_at}</p>
         <details>
           <summary>地点资料快照</summary>

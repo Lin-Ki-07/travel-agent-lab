@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
+  getPreferences,
   getPlan,
   listSavedPlans,
   parseRequest,
@@ -15,6 +16,7 @@ import ChatComposer from './ChatComposer'
 import HistoryPanel from './HistoryPanel'
 import ItineraryView from './ItineraryView'
 import MapPanel from './MapPanel'
+import PreferencesEditor from './PreferencesEditor'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
 import { formatParseReply, fromParsedFields, type TripFormValues } from './tripRequest'
@@ -70,6 +72,8 @@ export default function App() {
   const [chats, setChats] = useState<Chat[]>(() => [createChat()])
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set())
   const [savedPlans, setSavedPlans] = useState<SavedPlanSummary[]>([])
+  const [defaultPreferences, setDefaultPreferences] = useState<string[]>([])
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false)
   const [openingPlanId, setOpeningPlanId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState(chats[0].id)
   const [saving, setSaving] = useState(false)
@@ -101,6 +105,26 @@ export default function App() {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    getPreferences()
+      .then((result) => {
+        if (!cancelled) {
+          setDefaultPreferences(result.preferences)
+          setPreferencesLoaded(true)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setNotice({
+            kind: 'error',
+            text: `读取默认偏好失败：${errorText(error, '请稍后刷新页面。')}`,
+          })
+        }
+      })
+    return () => { cancelled = true }
   }, [])
   function updateChat(id: string, changes: Partial<Chat>) {
     setChats((prev) =>
@@ -290,6 +314,13 @@ export default function App() {
         <p className="muted history-note">
           仅已保存行程可在刷新后重新打开；聊天消息、草稿和手动标题不会恢复。
         </p>
+        {preferencesLoaded && (
+          <PreferencesEditor
+            key={defaultPreferences.join('\u0000')}
+            preferences={defaultPreferences}
+            onSaved={setDefaultPreferences}
+          />
+        )}
       </aside>
 
       <ResizeHandle label="调整左栏宽度" onDragStart={beginDrag} onDrag={dragLeft} />
@@ -334,6 +365,8 @@ export default function App() {
           {chats.filter((chat) => !chat.plan).map((chat) => (
             <div key={chat.id} hidden={chat.id !== selectedId}>
               <NewChatView
+                defaultPreferences={defaultPreferences}
+                preferencesLoaded={preferencesLoaded}
                 formOpen={chat.formOpen}
                 onFormOpenChange={(open) => updateChat(chat.id, { formOpen: open })}
                 prefill={chat.prefill}

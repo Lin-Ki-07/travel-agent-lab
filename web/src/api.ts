@@ -149,3 +149,22 @@ export function updatePlanDay(
     },
   )
 }
+
+export interface PreferencesResponse {
+  preferences: string[]
+}
+
+export function getPreferences(baseUrl = ''): Promise<PreferencesResponse> {
+  return requestJson<PreferencesResponse>(`${baseUrl}/api/preferences`, { method: 'GET' })
+}
+
+export function putPreferences(
+  preferences: string[],
+  baseUrl = '',
+): Promise<PreferencesResponse> {
+  return requestJson<PreferencesResponse>(`${baseUrl}/api/preferences`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ preferences }),
+  })
+}

@@ -3,6 +3,8 @@ import TripForm from './TripForm'
 import type { TripFormValues } from './tripRequest'
 
 interface NewChatViewProps {
+  defaultPreferences: string[]
+  preferencesLoaded: boolean
   formOpen: boolean
   onFormOpenChange: (open: boolean) => void
   // 解析结果：有值时表单以这些字段初始化；formKey 变化会重新挂载表单。
@@ -13,6 +15,8 @@ interface NewChatViewProps {
 
 // “新聊天”内容区：助手问候与可折叠的需求表单卡片。输入框由上层提供。
 export default function NewChatView({
+  defaultPreferences,
+  preferencesLoaded,
   formOpen,
   onFormOpenChange,
   prefill,
@@ -31,7 +35,13 @@ export default function NewChatView({
         onToggle={(event) => onFormOpenChange(event.currentTarget.open)}
       >
         <summary>旅行需求表单（点击展开或收起）</summary>
-        <TripForm key={formKey} initialValues={prefill ?? undefined} onGenerated={onGenerated} />
+        <TripForm
+          key={formKey}
+          initialValues={prefill ?? undefined}
+          defaultPreferences={defaultPreferences}
+          preferencesLoaded={preferencesLoaded}
+          onGenerated={onGenerated}
+        />
       </details>
     </div>
   )
