@@ -121,6 +121,7 @@ def load_itinerary(
     return replace(
         validated,
         generated_at=datetime.fromisoformat(data["generated_at"]),
+        web_evidence=data.get("web_evidence", ""),
     )
 
 def list_saved_plans(db_path: Path = DB_PATH) -> list[dict]:

@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from core.exceptions import LLMError
 from core.itinerary_validator import parse_itinerary
 from core.llm_client import OpenAICompatibleClient
@@ -66,7 +68,8 @@ def generate_itinerary(
             raise RuntimeError(f"行程生成时模型请求失败：{exc}") from exc
 
         try:
-            return parse_itinerary(raw, request, places, weather)
+            itinerary = parse_itinerary(raw, request, places, weather)
+            return replace(itinerary, web_evidence=web_evidence)
         except ValueError as exc:
             last_error = exc
             if attempt == 0:
