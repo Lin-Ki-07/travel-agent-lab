@@ -12,7 +12,8 @@ from core.trip_models import Itinerary
 from core.trip_service import plan_trip
 from core.trip_parser import parse_trip_text
 from core.trip_store import (
-    list_saved_plans, load_itinerary, save_itinerary, update_itinerary,
+    list_saved_plans, load_itinerary, load_preferences, save_itinerary,
+    save_preferences, update_itinerary,
 )
 from core.map_view import build_map_days
 
@@ -45,7 +46,10 @@ def create_llm() -> OpenAICompatibleClient:
 @app.post("/api/plans")
 def create_plan(raw_request: dict[str, str]) -> dict:
     try:
-        itinerary = plan_trip(create_llm(), raw_request)
+        effective_request = dict(raw_request)
+        if not effective_request.get("preferences", "").strip():
+            effective_request["preferences"] = ",".join(load_preferences())
+        itinerary = plan_trip(create_llm(), effective_request)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -69,6 +73,24 @@ def parse_request(raw_request: dict[str, str]) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/api/preferences")
+def get_preferences() -> dict:
+    return {"preferences": load_preferences()}
+
+
+@app.put("/api/preferences")
+def put_preferences(raw: dict) -> dict:
+    preferences = raw.get("preferences")
+    if not isinstance(preferences, list) or any(
+        not isinstance(item, str) for item in preferences
+    ):
+        raise HTTPException(status_code=422, detail="preferences 必须是字符串列表")
+    try:
+        return {"preferences": save_preferences(preferences)}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 @app.get("/api/plans")
 def get_saved_plans() -> dict:

@@ -26,6 +26,12 @@ def _connect(db_path: Path) -> sqlite3.Connection:
             updated_at TEXT NOT NULL
         )
     """)
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS travel_preferences (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            preferences_json TEXT NOT NULL
+        )
+    """)
     return connection
 
 
@@ -159,3 +165,29 @@ def update_itinerary(
                 (payload, now, plan_id, SCHEMA_VERSION),
             )
             return cursor.rowcount == 1
+
+
+def load_preferences(db_path: Path = DB_PATH) -> list[str]:
+    with closing(_connect(db_path)) as connection:
+        row = connection.execute(
+            "SELECT preferences_json FROM travel_preferences WHERE id = 1"
+        ).fetchone()
+    return json.loads(row[0]) if row else []
+
+
+def save_preferences(
+    preferences: list[str],
+    db_path: Path = DB_PATH,
+) -> list[str]:
+    cleaned = [item.strip() for item in preferences]
+    if len(cleaned) > 20 or any(not item or len(item) > 100 for item in cleaned):
+        raise ValueError("偏好最多 20 项，每项须为 1–100 个字符")
+
+    with closing(_connect(db_path)) as connection:
+        with connection:
+            connection.execute(
+                "INSERT INTO travel_preferences (id, preferences_json) VALUES (1, ?) "
+                "ON CONFLICT(id) DO UPDATE SET preferences_json = excluded.preferences_json",
+                (json.dumps(cleaned, ensure_ascii=False),),
+            )
+    return cleaned
