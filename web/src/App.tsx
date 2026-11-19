@@ -303,7 +303,6 @@ export default function App() {
       <aside className="pane pane-history" aria-label="对话列表">
         <HistoryPanel
           chats={chats}
-          savedIds={savedIds}
           savedPlans={savedPlans}
           selectedId={selectedId}
           onSelect={handleSelect}
@@ -311,9 +310,6 @@ export default function App() {
           onNewChat={handleNewChat}
           onRename={handleRename}
         />
-        <p className="muted history-note">
-          仅已保存行程可在刷新后重新打开；聊天消息、草稿和手动标题不会恢复。
-        </p>
         {preferencesLoaded && (
           <PreferencesEditor
             key={defaultPreferences.join('\u0000')}
