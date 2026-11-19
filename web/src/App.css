@@ -422,6 +422,45 @@ body {
   background: transparent;
 }
 
+.plan-result-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #8885;
+  border-radius: 10px;
+  background: #8881;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-result-card:hover {
+  background: #8882;
+}
+
+.plan-result-card strong,
+.plan-result-subtitle {
+  display: block;
+}
+
+.plan-result-subtitle {
+  margin-top: 6px;
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.plan-result-arrow {
+  font-size: 1.25rem;
+}
+
+.plan-dialog {
+  width: min(860px, 100%);
+}
+
 .chat-pane {
   display: flex;
   flex-direction: column;

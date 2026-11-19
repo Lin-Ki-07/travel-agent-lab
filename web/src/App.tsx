@@ -14,7 +14,7 @@ import {
 } from './api'
 import ChatComposer from './ChatComposer'
 import HistoryPanel from './HistoryPanel'
-import ItineraryView from './ItineraryView'
+import PlanResultView from './PlanResultView'
 import MapPanel from './MapPanel'
 import PreferencesEditor from './PreferencesEditor'
 import NewChatView from './NewChatView'
@@ -353,7 +353,7 @@ export default function App() {
 
       <main className="pane chat-pane" aria-label="对话">
         <div className="chat-scroll">
-          {notice && (
+          {notice && !selected && (
             <div
               className={notice.kind === 'error' ? 'banner banner-error' : 'banner banner-success'}
               role={notice.kind === 'error' ? 'alert' : 'status'}
@@ -368,21 +368,14 @@ export default function App() {
                 {selected.itinerary.request.destination} · {selected.itinerary.request.start_date} 起 ·{' '}
                 {selected.itinerary.request.days} 天 · {selected.itinerary.request.travelers} 人
               </div>
-              <div className="chat-bubble assistant">
-                行程已生成。右侧可按天查看地图，下方为逐日安排。
-              </div>
-              <div className="plan-toolbar">
-                <p className="muted">
-                  plan_id：{selected.plan_id}（{isSaved ? '已保存' : '未保存，刷新页面后无法重新打开'}）
-                </p>
-                <button type="button" onClick={handleSave} disabled={saving || isSaved}>
-                  {isSaved ? '已保存' : saving ? '保存中…' : '保存当前行程'}
-                </button>
-              </div>
-              <ItineraryView
-                itinerary={selected.itinerary}
-                editable={isSaved}
+              <PlanResultView
+                key={selected.plan_id}
+                plan={selected}
+                notice={notice}
+                isSaved={isSaved}
+                saving={saving}
                 savingEdit={savingEdit}
+                onSave={handleSave}
                 onEditDay={handleEditDay}
               />
             </div>
