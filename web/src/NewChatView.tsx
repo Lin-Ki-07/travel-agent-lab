@@ -13,7 +13,7 @@ interface NewChatViewProps {
   onGenerated: (result: CreatePlanResponse) => void
 }
 
-// “新聊天”内容区：助手问候与可折叠的需求表单卡片。输入框由上层提供。
+// “新聊天”内容区：卡片打开浮层表单。输入框由上层提供。
 export default function NewChatView({
   defaultPreferences,
   preferencesLoaded,
@@ -29,20 +29,38 @@ export default function NewChatView({
         你好，我是 Travel Agent。请告诉我目的地、出发日期和天数，我会生成逐日行程。
       </div>
 
-      <details
-        className="chat-card"
-        open={formOpen}
-        onToggle={(event) => onFormOpenChange(event.currentTarget.open)}
-      >
-        <summary>旅行需求表单（点击展开或收起）</summary>
-        <TripForm
-          key={formKey}
-          initialValues={prefill ?? undefined}
-          defaultPreferences={defaultPreferences}
-          preferencesLoaded={preferencesLoaded}
-          onGenerated={onGenerated}
+      <button type="button" className="chat-card form-card-trigger" onClick={() => onFormOpenChange(true)}>
+        旅行需求表单
+      </button>
+      <div className={formOpen ? 'form-overlay' : 'form-overlay form-overlay-hidden'}>
+        <button
+          type="button"
+          className="form-overlay-backdrop"
+          aria-label="关闭旅行需求表单"
+          tabIndex={formOpen ? 0 : -1}
+          onClick={() => onFormOpenChange(false)}
         />
-      </details>
+        <div
+          className="form-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="旅行需求表单"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') onFormOpenChange(false)
+          }}
+        >
+          <button type="button" className="form-close" onClick={() => onFormOpenChange(false)}>
+            关闭
+          </button>
+          <TripForm
+            key={formKey}
+            initialValues={prefill ?? undefined}
+            defaultPreferences={defaultPreferences}
+            preferencesLoaded={preferencesLoaded}
+            onGenerated={onGenerated}
+          />
+        </div>
+      </div>
     </div>
   )
 }
