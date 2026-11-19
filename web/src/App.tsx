@@ -28,6 +28,7 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   text: string
   planCard?: boolean
+  pending?: boolean
 }
 
 interface Chat {
@@ -243,6 +244,12 @@ export default function App() {
       : chat))
   }
 
+  function removePendingMessage(chatId: string) {
+    setChats((prev) => prev.map((chat) => chat.id === chatId
+      ? { ...chat, messages: chat.messages.filter((message) => !message.pending) }
+      : chat))
+  }
+
   async function handleSend(text: string) {
     const chatId = currentChat.id
     if (sendingChats.current.has(chatId)) return
@@ -273,11 +280,13 @@ export default function App() {
           text: formatParseReply({ summary: summarizeTripFields(merged), missing, issues: missing.length ? [] : issues }),
         }])
       } else {
-        appendMessages(chatId, [{ role: 'assistant', text: '信息已齐全，正在生成行程…' }])
+        appendMessages(chatId, [{ role: 'assistant', text: '信息已齐全，正在生成行程…', pending: true }])
         const plan = await createPlan(toRequestBody(merged))
+        removePendingMessage(chatId)
         handleGenerated(chatId, plan)
       }
     } catch (error) {
+      removePendingMessage(chatId)
       appendMessages(chatId, [
         {
           role: 'assistant',
