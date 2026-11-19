@@ -27,6 +27,40 @@ export function fromParsedFields(fields: Record<string, string>): TripFormValues
   }
 }
 
+// 对话中的补充只覆盖本次明确识别到的字段，不清空前几轮已填写的内容。
+export function mergeParsedFields(previous: TripFormValues | null, fields: Record<string, string>): TripFormValues {
+  const next = { ...(previous ?? emptyTripForm) }
+  for (const key of ['destination', 'start_date', 'travelers', 'budget_cny', 'preferences'] as const) {
+    if (fields[key]?.trim()) next[key] = fields[key].trim()
+  }
+  if (fields.days?.trim()) {
+    next.days = fields.days.trim()
+    next.end_date = ''
+    next.durationMode = 'days'
+  } else if (fields.end_date?.trim()) {
+    next.end_date = fields.end_date.trim()
+    next.days = ''
+    next.durationMode = 'end_date'
+  }
+  return next
+}
+
+export function missingTripFields(values: TripFormValues): string[] {
+  return [
+    ...(!values.destination.trim() ? ['destination'] : []),
+    ...(!values.start_date.trim() ? ['start_date'] : []),
+    ...(!values.days.trim() && !values.end_date.trim() ? ['days'] : []),
+  ]
+}
+
+export function summarizeTripFields(values: TripFormValues): string {
+  const parts = [values.destination, values.start_date && `${values.start_date} 出发`,
+    values.days && `${values.days} 天`, values.end_date && `${values.end_date} 结束`,
+    values.travelers && `${values.travelers} 人`, values.budget_cny && `预算约 ${values.budget_cny} 元`,
+    values.preferences && `偏好：${values.preferences}`].filter(Boolean)
+  return parts.length ? parts.join('，') : '未能识别出有效的旅行需求'
+}
+
 const MISSING_LABELS: Record<string, string> = {
   destination: '目的地',
   start_date: '出发日期',
@@ -47,7 +81,7 @@ export function formatParseReply(result: {
     parts.push(`请检查：${result.issues.join('；')}。`)
   }
   if (result.missing.length === 0 && result.issues.length === 0) {
-    parts.push('请确认表单内容后点击“生成行程”。')
+    parts.push('信息已齐全。请点击上方“旅行需求表单”确认内容并生成行程。')
   }
   return parts.join('')
 }

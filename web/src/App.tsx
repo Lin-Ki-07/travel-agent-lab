@@ -19,7 +19,7 @@ import MapPanel from './MapPanel'
 import PreferencesEditor from './PreferencesEditor'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
-import { formatParseReply, fromParsedFields, type TripFormValues } from './tripRequest'
+import { formatParseReply, mergeParsedFields, missingTripFields, summarizeTripFields, type TripFormValues } from './tripRequest'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
@@ -251,19 +251,30 @@ export default function App() {
       return
     }
 
-    // 新聊天：调用后端解析需求，结果填入表单，由用户确认后再生成。
+    // 每次只解析本条消息，再与当前聊天已识别的字段合并；缺失项留在对话中追问。
     appendMessages(chatId, [{ role: 'user', text }])
     updateChat(chatId, { parsing: true })
     try {
       const result = await parseRequest(text)
-      updateChat(chatId, {
-        prefill: fromParsedFields(result.fields),
-        formKey: currentChat.formKey + 1,
-        formOpen: true,
-      })
-      appendMessages(chatId, [{ role: 'assistant', text: formatParseReply(result) }])
+      setChats((prev) => prev.map((chat) => {
+        if (chat.id !== chatId) return chat
+        const merged = mergeParsedFields(chat.prefill, result.fields)
+        const missing = missingTripFields(merged)
+        const reply = formatParseReply({
+          summary: summarizeTripFields(merged),
+          missing,
+          issues: missing.length ? [] : result.issues,
+        })
+        return {
+          ...chat,
+          prefill: merged,
+          formKey: chat.formKey + 1,
+          title: chat.titleSource === 'auto' && merged.destination
+            ? `${merged.destination}旅游攻略` : chat.title,
+          messages: [...chat.messages, { role: 'assistant', text: reply }],
+        }
+      }))
     } catch (error) {
-      updateChat(chatId, { formOpen: true })
       appendMessages(chatId, [
         {
           role: 'assistant',

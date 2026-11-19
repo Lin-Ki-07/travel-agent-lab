@@ -313,7 +313,8 @@ body {
 }
 
 .chat-bubble {
-  max-width: 90%;
+  width: fit-content;
+  max-width: 85%;
   padding: 10px 14px;
   border-radius: 12px;
   line-height: 1.5;
@@ -321,14 +322,19 @@ body {
 }
 
 .chat-bubble.user {
-  align-self: flex-end;
+  max-width: 70%;
+  margin-left: auto;
   background: #2a71d3;
   color: #fff;
 }
 
 .chat-bubble.assistant {
-  align-self: flex-start;
+  margin-right: auto;
   background: #8882;
+}
+
+.chat-scroll > .chat-bubble {
+  margin-top: 12px;
 }
 
 .welcome-card {
