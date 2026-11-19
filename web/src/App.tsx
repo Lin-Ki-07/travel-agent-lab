@@ -56,6 +56,18 @@ function createChat(): Chat {
   }
 }
 
+type Theme = 'light' | 'dark'
+
+function initialTheme(): Theme {
+  try {
+    const saved = localStorage.getItem('travel-agent-theme')
+    if (saved === 'light' || saved === 'dark') return saved
+  } catch {
+    // 浏览器禁用本地存储时，仍可在当前页面切换主题。
+  }
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
 // 三栏宽度限制（像素）。中间栏为自适应剩余空间，并保证不小于 CENTER_MIN。
 const LEFT_MIN = 160
 const LEFT_MAX = 420
@@ -69,6 +81,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 // 对话先拥有独立 ID，生成行程后再关联后端 plan_id。
 // 聊天状态只在当前页面内存中；刷新后只从后端恢复已保存行程。
 export default function App() {
+  const [theme, setTheme] = useState<Theme>(initialTheme)
   const [chats, setChats] = useState<Chat[]>(() => [createChat()])
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set())
   const [savedPlans, setSavedPlans] = useState<SavedPlanSummary[]>([])
@@ -82,6 +95,15 @@ export default function App() {
   const [leftWidth, setLeftWidth] = useState(240)
   const [rightWidth, setRightWidth] = useState(420)
   const widthsAtDragStart = useRef({ left: 240, right: 420 })
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try {
+      localStorage.setItem('travel-agent-theme', theme)
+    } catch {
+      // 存储不可用不影响当前页面的主题。
+    }
+  }, [theme])
 
   const currentChat = chats.find((chat) => chat.id === selectedId)!
   const selected = currentChat.plan
@@ -301,6 +323,14 @@ export default function App() {
   return (
     <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
       <aside className="pane pane-history" aria-label="对话列表">
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
+          aria-label={theme === 'dark' ? '切换到白天模式' : '切换到黑夜模式'}
+        >
+          {theme === 'dark' ? '☀ 白天' : '☾ 黑夜'}
+        </button>
         <HistoryPanel
           chats={chats}
           savedPlans={savedPlans}

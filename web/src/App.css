@@ -1,6 +1,14 @@
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  background: #f7f8fa;
+  color: #1c2430;
   font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  background: #15171b;
+  color: #f1f3f5;
 }
 
 body {
@@ -251,6 +259,22 @@ body {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.theme-toggle {
+  display: block;
+  margin: 0 0 12px auto;
+  padding: 6px 10px;
+  border: 1px solid #8885;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: #8882;
 }
 
 .new-chat-button:hover {
