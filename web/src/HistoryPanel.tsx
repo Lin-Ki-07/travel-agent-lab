@@ -9,6 +9,10 @@ interface HistoryPanelProps {
   onRename: (chatId: string, title: string) => void
   savedPlans: SavedPlanSummary[]
   onOpenSaved: (planId: string) => void
+  pinnedIds: ReadonlySet<string>
+  archivedIds: ReadonlySet<string>
+  onTogglePin: (id: string) => void
+  onToggleArchive: (id: string) => void
 }
 
 interface ContextMenu {
@@ -25,10 +29,22 @@ export default function HistoryPanel({
   onOpenSaved,
   onNewChat,
   onRename,
+  pinnedIds,
+  archivedIds,
+  onTogglePin,
+  onToggleArchive,
 }: HistoryPanelProps) {
   const [menu, setMenu] = useState<ContextMenu | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const openPlanIds = new Set(chats.flatMap((chat) => chat.plan ? [chat.plan.plan_id] : []))
+  const entries = [
+    ...chats.map((chat) => ({ id: chat.plan?.plan_id ?? chat.id, chatId: chat.id, title: chat.title, planId: null as string | null })),
+    ...savedPlans.filter((plan) => !openPlanIds.has(plan.plan_id)).map((plan) => ({
+      id: plan.plan_id, chatId: null as string | null, planId: plan.plan_id, title: `${plan.destination}旅游攻略`,
+    })),
+  ]
+  const ordered = [...entries].sort((a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)))
 
   function closeMenu() {
     setMenu(null)
@@ -59,20 +75,20 @@ export default function HistoryPanel({
       </button>
 
       <ul className="history-list">
-          {chats.map((chat) => {
-            const selected = chat.id === selectedId
-
+          {ordered.filter((entry) => !archivedIds.has(entry.id)).map((entry) => {
+            const selected = entry.chatId === selectedId
             return (
-              <li key={chat.id}>
+              <li key={entry.id} className="history-item">
                 <button
                   type="button"
                   className={selected ? 'history-row active' : 'history-row'}
-                  onClick={() => onSelect(chat.id)}
+                  onClick={() => entry.chatId ? onSelect(entry.chatId) : onOpenSaved(entry.planId!)}
                   onContextMenu={(event) => {
+                    if (!entry.chatId) return
                     event.preventDefault()
                     triggerRef.current = event.currentTarget
                     setMenu({
-                      chatId: chat.id,
+                      chatId: entry.chatId,
                       x: Math.max(
                         8,
                         Math.min(event.clientX, window.innerWidth - 188),
@@ -85,27 +101,31 @@ export default function HistoryPanel({
                   }}
                   aria-current={selected ? 'true' : undefined}
                   aria-haspopup="menu"
-                  aria-expanded={menu?.chatId === chat.id}
-                  title={chat.title}
+                  aria-expanded={menu?.chatId === entry.chatId}
+                  title={entry.title}
                 >
-                  <span className="history-title">{chat.title}</span>
+                  <span className="history-title">{entry.title}</span>
                 </button>
+                <span className="history-actions">
+                  <button type="button" title={pinnedIds.has(entry.id) ? '取消置顶' : '置顶'} aria-label={`${pinnedIds.has(entry.id) ? '取消置顶' : '置顶'}${entry.title}`} onClick={() => onTogglePin(entry.id)}>{pinnedIds.has(entry.id) ? '◆' : '◇'}</button>
+                  <button type="button" title="归档" aria-label={`归档${entry.title}`} onClick={() => onToggleArchive(entry.id)}>▣</button>
+                </span>
               </li>
             )
           })}
-          {savedPlans.filter((plan) => !openPlanIds.has(plan.plan_id)).map((plan) => (
-            <li key={plan.plan_id}>
-              <button
-                type="button"
-                className="history-row"
-                onClick={() => onOpenSaved(plan.plan_id)}
-                title={`${plan.destination} · ${plan.start_date} 起 ${plan.days} 天`}
-              >
-                <span className="history-title">{plan.destination}旅游攻略</span>
-              </button>
-            </li>
-          ))}
       </ul>
+
+      {entries.some((entry) => archivedIds.has(entry.id)) && (
+        <div className="archived-chats">
+          <button type="button" className="archived-toggle" onClick={() => setShowArchived((value) => !value)} aria-expanded={showArchived}>归档 {showArchived ? '▾' : '▸'}</button>
+          {showArchived && <ul className="history-list">{entries.filter((entry) => archivedIds.has(entry.id)).map((entry) => (
+            <li key={entry.id} className="history-item">
+              <button type="button" className="history-row" onClick={() => entry.chatId ? onSelect(entry.chatId) : onOpenSaved(entry.planId!)}>{entry.title}</button>
+              <span className="history-actions"><button type="button" title="取消归档" aria-label={`取消归档${entry.title}`} onClick={() => onToggleArchive(entry.id)}>↩</button></span>
+            </li>
+          ))}</ul>}
+        </div>
+      )}
 
       {menu && (
         <>

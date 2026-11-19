@@ -85,6 +85,8 @@ export default function App() {
   const [chats, setChats] = useState<Chat[]>(() => [createChat()])
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set())
   const [savedPlans, setSavedPlans] = useState<SavedPlanSummary[]>([])
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => readIdSet('travel-agent-pinned'))
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(() => readIdSet('travel-agent-archived'))
   const [defaultPreferences, setDefaultPreferences] = useState<string[]>([])
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
   const [openingPlanId, setOpeningPlanId] = useState<string | null>(null)
@@ -104,6 +106,13 @@ export default function App() {
       // 存储不可用不影响当前页面的主题。
     }
   }, [theme])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('travel-agent-pinned', JSON.stringify([...pinnedIds]))
+      localStorage.setItem('travel-agent-archived', JSON.stringify([...archivedIds]))
+    } catch { /* 存储不可用时仅在当前页面保留。 */ }
+  }, [pinnedIds, archivedIds])
 
   const currentChat = chats.find((chat) => chat.id === selectedId)!
   const selected = currentChat.plan
@@ -339,6 +348,10 @@ export default function App() {
           onOpenSaved={handleOpenSaved}
           onNewChat={handleNewChat}
           onRename={handleRename}
+          pinnedIds={pinnedIds}
+          archivedIds={archivedIds}
+          onTogglePin={(id) => setPinnedIds((current) => toggleId(current, id))}
+          onToggleArchive={(id) => setArchivedIds((current) => toggleId(current, id))}
         />
         {preferencesLoaded && (
           <PreferencesEditor
@@ -426,4 +439,18 @@ export default function App() {
 function errorText(error: unknown, fallback: string): string {
   if (error instanceof PlanApiError) return error.message
   return fallback
+}
+
+function readIdSet(key: string): Set<string> {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(key) ?? '[]')
+    return new Set(Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [])
+  } catch { return new Set() }
+}
+
+function toggleId(current: ReadonlySet<string>, id: string): Set<string> {
+  const next = new Set(current)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  return next
 }
