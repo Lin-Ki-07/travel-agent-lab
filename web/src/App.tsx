@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
+  createPlan,
   getPreferences,
   getPlan,
   listSavedPlans,
@@ -19,7 +20,7 @@ import MapPanel from './MapPanel'
 import PreferencesEditor from './PreferencesEditor'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
-import { formatParseReply, mergeParsedFields, missingTripFields, summarizeTripFields, type TripFormValues } from './tripRequest'
+import { formatParseReply, mergeParsedFields, missingTripFields, summarizeTripFields, toRequestBody, validateTripForm, type TripFormValues } from './tripRequest'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
@@ -97,6 +98,7 @@ export default function App() {
   const [leftWidth, setLeftWidth] = useState(240)
   const [rightWidth, setRightWidth] = useState(420)
   const widthsAtDragStart = useRef({ left: 240, right: 420 })
+  const sendingChats = useRef(new Set<string>())
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -240,6 +242,7 @@ export default function App() {
 
   async function handleSend(text: string) {
     const chatId = currentChat.id
+    if (sendingChats.current.has(chatId)) return
     updateChat(chatId, { draft: '' })
 
     // 已生成的行程页面：不再解析，只提示如何开始新的规划。
@@ -253,35 +256,33 @@ export default function App() {
 
     // 每次只解析本条消息，再与当前聊天已识别的字段合并；缺失项留在对话中追问。
     appendMessages(chatId, [{ role: 'user', text }])
+    sendingChats.current.add(chatId)
     updateChat(chatId, { parsing: true })
     try {
       const result = await parseRequest(text)
-      setChats((prev) => prev.map((chat) => {
-        if (chat.id !== chatId) return chat
-        const merged = mergeParsedFields(chat.prefill, result.fields)
-        const missing = missingTripFields(merged)
-        const reply = formatParseReply({
-          summary: summarizeTripFields(merged),
-          missing,
-          issues: missing.length ? [] : result.issues,
-        })
-        return {
-          ...chat,
-          prefill: merged,
-          formKey: chat.formKey + 1,
-          title: chat.titleSource === 'auto' && merged.destination
-            ? `${merged.destination}旅游攻略` : chat.title,
-          messages: [...chat.messages, { role: 'assistant', text: reply }],
-        }
-      }))
+      const merged = mergeParsedFields(currentChat.prefill, result.fields)
+      const missing = missingTripFields(merged)
+      const issues = Object.values(validateTripForm(merged))
+      updateChat(chatId, { prefill: merged, formKey: currentChat.formKey + 1 })
+      if (missing.length || issues.length) {
+        appendMessages(chatId, [{
+          role: 'assistant',
+          text: formatParseReply({ summary: summarizeTripFields(merged), missing, issues: missing.length ? [] : issues }),
+        }])
+      } else {
+        appendMessages(chatId, [{ role: 'assistant', text: '信息已齐全，正在生成行程…' }])
+        const plan = await createPlan(toRequestBody(merged))
+        updateChat(chatId, { plan })
+      }
     } catch (error) {
       appendMessages(chatId, [
         {
           role: 'assistant',
-          text: `需求解析失败：${errorText(error, '请稍后重试。')} 你可以直接在表单中填写。`,
+          text: `处理失败：${errorText(error, '请稍后重试。')} 已识别的信息保留在表单中。`,
         },
       ])
     } finally {
+      sendingChats.current.delete(chatId)
       updateChat(chatId, { parsing: false })
     }
   }

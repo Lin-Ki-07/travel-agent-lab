@@ -80,9 +80,6 @@ export function formatParseReply(result: {
   if (result.issues.length > 0) {
     parts.push(`请检查：${result.issues.join('；')}。`)
   }
-  if (result.missing.length === 0 && result.issues.length === 0) {
-    parts.push('信息已齐全。请点击上方“旅行需求表单”确认内容并生成行程。')
-  }
   return parts.join('')
 }
 
