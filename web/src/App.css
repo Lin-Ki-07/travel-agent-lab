@@ -310,20 +310,38 @@ body {
   background: #8882;
 }
 
-.chat-card {
+.welcome-card {
   border: 1px solid #8885;
   border-radius: 10px;
   background: #8881;
-  padding: 10px 14px;
+  overflow: hidden;
+}
+
+.welcome-message {
+  padding: 16px 18px;
+  line-height: 1.5;
 }
 
 .form-card-trigger {
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border: none;
+  border-top: 1px solid #8885;
+  background: transparent;
   color: inherit;
   font: inherit;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
+}
+
+.form-card-arrow {
+  font-size: 1.25rem;
+  line-height: 1;
 }
 
 .form-card-trigger:hover {

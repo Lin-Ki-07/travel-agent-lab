@@ -13,7 +13,7 @@ interface NewChatViewProps {
   onGenerated: (result: CreatePlanResponse) => void
 }
 
-// “新聊天”内容区：卡片打开浮层表单。输入框由上层提供。
+// “新聊天”内容区：欢迎语和表单入口共用一张卡片。输入框由上层提供。
 export default function NewChatView({
   defaultPreferences,
   preferencesLoaded,
@@ -25,13 +25,15 @@ export default function NewChatView({
 }: NewChatViewProps) {
   return (
     <div className="new-chat">
-      <div className="chat-bubble assistant">
-        你好，我是 Travel Agent。请告诉我目的地、出发日期和天数，我会生成逐日行程。
+      <div className="welcome-card">
+        <div className="welcome-message">
+          你好，我是 Travel Agent。你可以在下方开始对话，告诉我目的地、出发日期和天数；也可以填写旅行需求表单。
+        </div>
+        <button type="button" className="form-card-trigger" onClick={() => onFormOpenChange(true)}>
+          <span>旅行需求表单</span>
+          <span className="form-card-arrow" aria-hidden="true">→</span>
+        </button>
       </div>
-
-      <button type="button" className="chat-card form-card-trigger" onClick={() => onFormOpenChange(true)}>
-        旅行需求表单
-      </button>
       <div className={formOpen ? 'form-overlay' : 'form-overlay form-overlay-hidden'}>
         <button
           type="button"
