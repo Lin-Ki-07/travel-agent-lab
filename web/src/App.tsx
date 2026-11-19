@@ -27,6 +27,7 @@ type Notice = { kind: 'success' | 'error'; text: string } | null
 interface ChatMessage {
   role: 'user' | 'assistant'
   text: string
+  planCard?: boolean
 }
 
 interface Chat {
@@ -186,7 +187,9 @@ export default function App() {
   }
 
   function handleGenerated(chatId: string, result: CreatePlanResponse) {
-    updateChat(chatId, { plan: result })
+    setChats((prev) => prev.map((chat) => chat.id === chatId
+      ? { ...chat, plan: result, messages: [...chat.messages, { role: 'assistant', text: '', planCard: true }] }
+      : chat))
   }
 
   function handleSelect(planId: string) {
@@ -272,7 +275,7 @@ export default function App() {
       } else {
         appendMessages(chatId, [{ role: 'assistant', text: '信息已齐全，正在生成行程…' }])
         const plan = await createPlan(toRequestBody(merged))
-        updateChat(chatId, { plan })
+        handleGenerated(chatId, plan)
       }
     } catch (error) {
       appendMessages(chatId, [
@@ -387,25 +390,6 @@ export default function App() {
             </div>
           )}
 
-          {selected ? (
-            <div className="new-chat">
-              <div className="chat-bubble user">
-                {selected.itinerary.request.destination} · {selected.itinerary.request.start_date} 起 ·{' '}
-                {selected.itinerary.request.days} 天 · {selected.itinerary.request.travelers} 人
-              </div>
-              <PlanResultView
-                key={selected.plan_id}
-                plan={selected}
-                notice={notice}
-                isSaved={isSaved}
-                saving={saving}
-                savingEdit={savingEdit}
-                onSave={handleSave}
-                onEditDay={handleEditDay}
-              />
-            </div>
-          ) : null}
-
           {chats.filter((chat) => !chat.plan).map((chat) => (
             <div key={chat.id} hidden={chat.id !== selectedId}>
               <NewChatView
@@ -421,10 +405,35 @@ export default function App() {
           ))}
 
           {currentChat.messages.map((message, index) => (
-            <div key={index} className={`chat-bubble ${message.role}`}>
-              {message.text}
-            </div>
+            message.planCard && selected ? (
+              <PlanResultView
+                key={`${selected.plan_id}-${index}`}
+                plan={selected}
+                notice={notice}
+                isSaved={isSaved}
+                saving={saving}
+                savingEdit={savingEdit}
+                onSave={handleSave}
+                onEditDay={handleEditDay}
+              />
+            ) : (
+              <div key={index} className={`chat-bubble ${message.role}`}>
+                {message.text}
+              </div>
+            )
           ))}
+          {selected && !currentChat.messages.some((message) => message.planCard) && (
+            <PlanResultView
+              key={selected.plan_id}
+              plan={selected}
+              notice={notice}
+              isSaved={isSaved}
+              saving={saving}
+              savingEdit={savingEdit}
+              onSave={handleSave}
+              onEditDay={handleEditDay}
+            />
+          )}
         </div>
 
         <div className="chat-dock">
