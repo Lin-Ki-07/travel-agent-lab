@@ -603,11 +603,19 @@ body {
 }
 
 .history-actions button {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
   border: 0;
   border-radius: 5px;
   background: transparent;
   color: inherit;
   cursor: pointer;
+}
+
+.history-actions svg {
+  display: block;
 }
 
 .history-actions button:hover {

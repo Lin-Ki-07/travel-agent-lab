@@ -21,6 +21,14 @@ interface ContextMenu {
   y: number
 }
 
+function PinIcon({ filled }: { filled: boolean }) {
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m16 3 5 5-3 1-3 5-2 2-5-5 2-2 5-3z"/><path d="m8 16-5 5"/></svg>
+}
+
+function ArchiveIcon({ restore = false }: { restore?: boolean }) {
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/>{restore ? <path d="m9 15 3-3 3 3M12 12v6"/> : <path d="M10 13h4"/>}</svg>
+}
+
 export default function HistoryPanel({
   chats,
   savedPlans,
@@ -107,8 +115,8 @@ export default function HistoryPanel({
                   <span className="history-title">{entry.title}</span>
                 </button>
                 <span className="history-actions">
-                  <button type="button" title={pinnedIds.has(entry.id) ? '取消置顶' : '置顶'} aria-label={`${pinnedIds.has(entry.id) ? '取消置顶' : '置顶'}${entry.title}`} onClick={() => onTogglePin(entry.id)}>{pinnedIds.has(entry.id) ? '◆' : '◇'}</button>
-                  <button type="button" title="归档" aria-label={`归档${entry.title}`} onClick={() => onToggleArchive(entry.id)}>▣</button>
+                  <button type="button" title={pinnedIds.has(entry.id) ? '取消置顶' : '置顶'} aria-label={`${pinnedIds.has(entry.id) ? '取消置顶' : '置顶'}${entry.title}`} onClick={() => onTogglePin(entry.id)}><PinIcon filled={pinnedIds.has(entry.id)} /></button>
+                  <button type="button" title="归档" aria-label={`归档${entry.title}`} onClick={() => onToggleArchive(entry.id)}><ArchiveIcon /></button>
                 </span>
               </li>
             )
@@ -121,7 +129,7 @@ export default function HistoryPanel({
           {showArchived && <ul className="history-list">{entries.filter((entry) => archivedIds.has(entry.id)).map((entry) => (
             <li key={entry.id} className="history-item">
               <button type="button" className="history-row" onClick={() => entry.chatId ? onSelect(entry.chatId) : onOpenSaved(entry.planId!)}>{entry.title}</button>
-              <span className="history-actions"><button type="button" title="取消归档" aria-label={`取消归档${entry.title}`} onClick={() => onToggleArchive(entry.id)}>↩</button></span>
+              <span className="history-actions"><button type="button" title="取消归档" aria-label={`取消归档${entry.title}`} onClick={() => onToggleArchive(entry.id)}><ArchiveIcon restore /></button></span>
             </li>
           ))}</ul>}
         </div>
