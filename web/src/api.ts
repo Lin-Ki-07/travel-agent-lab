@@ -60,7 +60,7 @@ export function extractDetail(body: unknown): string | null {
 const FALLBACK_BY_STATUS: Record<number, string> = {
   404: '行程不存在，或尚未保存。',
   422: '输入无效，请检查表单。',
-  502: '地点、天气或模型服务暂时失败，请稍后重试。',
+  502: '无法连接后端服务，请确认 uvicorn 已在 127.0.0.1:8000 启动。',
 }
 
 async function requestJson<T>(url: string, init: RequestInit): Promise<T> {
