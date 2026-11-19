@@ -175,7 +175,7 @@ body {
   font-size: 0.9rem;
 }
 
-.map-panel .day-tabs {
+.day-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -827,7 +827,24 @@ body {
 
 .evidence-card summary {
   cursor: pointer;
-  font-weight: 600;
+  display: inline-block;
+  padding: 5px 10px;
+  border: 1px solid #8886;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  list-style: none;
+}
+
+.evidence-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.evidence-card {
+  margin-top: 16px;
+}
+
+.evidence-card[open] {
+  padding: 0 4px 4px;
 }
 
 .evidence-list {

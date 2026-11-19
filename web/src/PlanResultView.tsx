@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { CreatePlanResponse, EditDayRequest } from './api'
 import ItineraryView from './ItineraryView'
+import EvidenceView from './EvidenceView'
 
 interface Props {
   plan: CreatePlanResponse
@@ -71,6 +72,7 @@ export default function PlanResultView({
               savingEdit={savingEdit}
               onEditDay={onEditDay}
             />
+            <EvidenceView evidence={plan.itinerary.web_evidence ?? ''} />
           </div>
         </div>
       )}

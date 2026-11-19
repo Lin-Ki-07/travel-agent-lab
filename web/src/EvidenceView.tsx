@@ -24,8 +24,8 @@ export default function EvidenceView({ evidence }: { evidence: string }) {
   const items = parseEvidence(evidence)
 
   return (
-    <details className="card evidence-card">
-      <summary>本次规划参考的网页资料（{items.length} 条）</summary>
+    <details className="evidence-card">
+      <summary>参考资料 · {items.length}</summary>
       <p className="muted">
         以下是搜索时取得的网页摘要，仅供追溯参考；不代表每项活动均由来源直接支持，
         也不能证明当前票价、开放时间或交通安排。请以来源网页和官方信息为准。

@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import DayEditor from './DayEditor'
-import EvidenceView from './EvidenceView'
 import type { EditDayRequest } from './api'
 import type { Itinerary } from './types'
 import {
-  budgetStatus,
   describeDay,
   formatCost,
   formatSegmentDuration,
@@ -24,60 +22,46 @@ export default function ItineraryView({
   itinerary, editable, savingEdit, onEditDay,
 }: ItineraryViewProps) {
   const [editingDay, setEditingDay] = useState<number | null>(null)
+  const [dayIndex, setDayIndex] = useState(0)
   const { places, daily_plans: days } = itinerary
+  const selectedDay = days[Math.min(dayIndex, days.length - 1)]
 
   return (
     <div className="itinerary">
-      <div className="card">
-        <h3>行程总览</h3>
-        <p className="muted">
-          {itinerary.request.destination} · {itinerary.request.start_date} 起 {itinerary.request.days} 天 ·{' '}
-          {itinerary.request.travelers} 人
-        </p>
-        <p>{budgetStatus(itinerary)}</p>
-        <p className="muted">
-          本次规划采用的偏好：{itinerary.request.preferences.length
-            ? itinerary.request.preferences.join('、')
-            : '未设置'}
-        </p>
-        <p className="muted">生成时间：{itinerary.generated_at}</p>
-        <details>
-          <summary>地点资料快照</summary>
-          <ul>
-            {places.map((place) => (
-              <li key={place.place_id}>
-                {place.name}（{place.place_id}）· {place.source} · 查询时间：{place.queried_at}
-              </li>
-            ))}
-          </ul>
-        </details>
-        <p className="muted">
-          以下地点、天气和费用均为生成行程时采用的资料或估算快照，
-          重新打开不会自动更新；出行前请核对最新信息。
-        </p>
+      <div className="day-tabs" role="tablist" aria-label="按日查看行程">
+        {days.map((day, index) => (
+          <button
+            key={day.day_number}
+            type="button"
+            role="tab"
+            aria-selected={index === dayIndex}
+            className={index === dayIndex ? 'day-tab active' : 'day-tab'}
+            onClick={() => setDayIndex(index)}
+          >
+            第 {day.day_number} 天
+          </button>
+        ))}
       </div>
 
-      <EvidenceView evidence={itinerary.web_evidence ?? ''} />
-
-      {days.map((day) => (
-        <section className="card day-card" key={day.day_number}>
-          <h3>{describeDay(day)}</h3>
+      {selectedDay && (
+        <section className="card day-card" key={selectedDay.day_number}>
+          <h3>{describeDay(selectedDay)}</h3>
           <p className="muted">
-            天气快照：{formatWeather(day.weather)}
-            （来源：{day.weather.source}；查询时间：{day.weather.queried_at}）
+            天气快照：{formatWeather(selectedDay.weather)}
+            （来源：{selectedDay.weather.source}；查询时间：{selectedDay.weather.queried_at}）
           </p>
           {editable && (
             <button
               type="button"
-              onClick={() => setEditingDay(day.day_number)}
+              onClick={() => setEditingDay(selectedDay.day_number)}
               disabled={savingEdit}
             >
               编辑当天
             </button>
           )}
-          {editingDay === day.day_number && (
+          {editingDay === selectedDay.day_number && (
             <DayEditor
-              day={day}
+              day={selectedDay}
               places={places}
               disabled={savingEdit}
               onCancel={() => setEditingDay(null)}
@@ -88,7 +72,7 @@ export default function ItineraryView({
             />
           )}
           <ol className="activity-list">
-            {day.activities.map((activity, index) => (
+            {selectedDay.activities.map((activity, index) => (
               <li key={`${activity.place_id}-${index}`}>
                 <div className="activity-time">{formatTimeRange(activity)}</div>
                 <div>
@@ -99,11 +83,11 @@ export default function ItineraryView({
             ))}
           </ol>
 
-          {day.transport_segments.length > 0 && (
+          {selectedDay.transport_segments.length > 0 && (
             <div className="transport">
               <h4>交通段</h4>
               <ul>
-                {day.transport_segments.map((segment, index) => (
+                {selectedDay.transport_segments.map((segment, index) => (
                   <li key={index}>
                     {placeNameById(places, segment.from_place_id)} → {placeNameById(places, segment.to_place_id)}
                     ：{segment.mode}，{formatSegmentDuration(segment)}
@@ -114,11 +98,11 @@ export default function ItineraryView({
           )}
 
           <p className="muted">
-            当日费用估算快照：{formatCost(day.estimated_cost_cny)}
-            {day.cost_basis ? `（${day.cost_basis}）` : ''}
+            当日费用估算快照：{formatCost(selectedDay.estimated_cost_cny)}
+            {selectedDay.cost_basis ? `（${selectedDay.cost_basis}）` : ''}
           </p>
         </section>
-      ))}
+      )}
     </div>
   )
 }
