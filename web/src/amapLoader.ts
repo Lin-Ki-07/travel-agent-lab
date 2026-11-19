@@ -13,6 +13,7 @@ export interface AMapMap {
 export interface AMapNamespace {
   Map: new (container: HTMLElement, options: Record<string, unknown>) => AMapMap
   Marker: new (options: Record<string, unknown>) => unknown
+  Pixel: new (x: number, y: number) => unknown
   Polyline: new (options: Record<string, unknown>) => unknown
 }
 

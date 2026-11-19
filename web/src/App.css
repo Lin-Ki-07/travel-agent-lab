@@ -222,6 +222,27 @@ body {
   border: 1px solid #8885;
 }
 
+.numbered-map-pin {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: #2a71d3;
+  border: 2px solid #fff;
+  box-sizing: border-box;
+  box-shadow: 0 2px 5px #0005;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.numbered-map-pin span {
+  transform: rotate(45deg);
+}
+
 .line-note {
   font-size: 0.85rem;
   opacity: 0.85;

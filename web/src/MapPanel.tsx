@@ -83,11 +83,17 @@ export default function MapPanel({ days }: MapPanelProps) {
     const overlays: unknown[] = []
 
     spec.markers.forEach((marker) => {
+      const pin = document.createElement('div')
+      pin.className = 'numbered-map-pin'
+      const number = document.createElement('span')
+      number.textContent = String(marker.order)
+      pin.appendChild(number)
       overlays.push(
         new AMap.Marker({
           position: marker.position,
           title: marker.name,
-          label: { content: String(marker.order), direction: 'top' },
+          content: pin,
+          offset: new AMap.Pixel(-16, -42),
         }),
       )
     })
