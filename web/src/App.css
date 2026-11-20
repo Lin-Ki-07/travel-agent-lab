@@ -54,6 +54,25 @@ body {
   border-right: none;
 }
 
+.pane-history {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.history {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.history-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .pane h2 {
   margin: 0 0 8px;
   font-size: 1.1rem;
@@ -280,22 +299,6 @@ body {
   font: inherit;
   text-align: left;
   cursor: pointer;
-}
-
-.theme-toggle {
-  display: block;
-  margin: 0 0 12px auto;
-  padding: 6px 10px;
-  border: 1px solid #8885;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.theme-toggle:hover {
-  background: #8882;
 }
 
 .new-chat-button:hover {
@@ -629,13 +632,70 @@ body {
   background: #8884;
 }
 
-.archived-chats {
-  margin-top: 10px;
+.history-bottom {
+  position: relative;
+  flex: none;
+  padding-top: 10px;
   border-top: 1px solid #8884;
-  padding-top: 8px;
 }
 
-.archived-toggle {
+.history-bottom-actions {
+  display: flex;
+  justify-content: space-around;
+  gap: 8px;
+}
+
+.history-bottom-actions button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.history-bottom-actions button:hover,
+.history-bottom-actions button[aria-expanded='true'] {
+  background: #8883;
+}
+
+.history-bottom-actions svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.history-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  max-height: min(50vh, 360px);
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid #8886;
+  border-radius: 10px;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 8px 28px #0003;
+  z-index: 10;
+}
+
+.history-popover-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.history-popover-heading button {
   border: 0;
   background: transparent;
   color: inherit;
@@ -862,9 +922,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 16px;
-  padding: 12px 10px;
-  border-top: 1px solid #8884;
+  margin-top: 0;
+  padding: 0;
+  border-top: none;
 }
 
 .preferences-editor input {

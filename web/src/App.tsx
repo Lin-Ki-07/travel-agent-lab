@@ -17,7 +17,6 @@ import ChatComposer from './ChatComposer'
 import HistoryPanel from './HistoryPanel'
 import PlanResultView from './PlanResultView'
 import MapPanel from './MapPanel'
-import PreferencesEditor from './PreferencesEditor'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
 import { findReplacementTargets } from './editIntent'
@@ -366,14 +365,6 @@ export default function App() {
   return (
     <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
       <aside className="pane pane-history" aria-label="对话列表">
-        <button
-          type="button"
-          className="theme-toggle"
-          onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
-          aria-label={theme === 'dark' ? '切换到白天模式' : '切换到黑夜模式'}
-        >
-          {theme === 'dark' ? '☀ 白天' : '☾ 黑夜'}
-        </button>
         <HistoryPanel
           chats={chats}
           savedPlans={savedPlans}
@@ -386,14 +377,12 @@ export default function App() {
           archivedIds={archivedIds}
           onTogglePin={(id) => setPinnedIds((current) => toggleId(current, id))}
           onToggleArchive={(id) => setArchivedIds((current) => toggleId(current, id))}
+          theme={theme}
+          onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
+          defaultPreferences={defaultPreferences}
+          preferencesLoaded={preferencesLoaded}
+          onPreferencesSaved={setDefaultPreferences}
         />
-        {preferencesLoaded && (
-          <PreferencesEditor
-            key={defaultPreferences.join('\u0000')}
-            preferences={defaultPreferences}
-            onSaved={setDefaultPreferences}
-          />
-        )}
       </aside>
 
       <ResizeHandle label="调整左栏宽度" onDragStart={beginDrag} onDrag={dragLeft} />
