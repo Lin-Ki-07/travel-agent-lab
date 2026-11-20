@@ -12,7 +12,7 @@ from core.trip_models import Itinerary
 from core.trip_service import plan_trip
 from core.trip_parser import parse_trip_text
 from core.trip_store import (
-    list_saved_plans, load_itinerary, load_preferences, save_itinerary,
+    delete_itinerary, list_saved_plans, load_itinerary, load_preferences, save_itinerary,
     save_preferences, update_itinerary,
 )
 from core.map_view import build_map_days
@@ -117,6 +117,15 @@ def get_plan(plan_id: str) -> dict:
         "itinerary": jsonable_encoder(asdict(itinerary)),
         "map_days": build_map_days(itinerary),
     }
+
+
+@app.delete("/api/plans/{plan_id}")
+def delete_plan(plan_id: str) -> dict:
+    deleted_saved = delete_itinerary(plan_id)
+    deleted_generated = generated_plans.pop(plan_id, None) is not None
+    if not deleted_saved and not deleted_generated:
+        raise HTTPException(status_code=404, detail="行程不存在")
+    return {"plan_id": plan_id, "deleted": True}
 
 
 @app.put("/api/plans/{plan_id}/days/{day_number}")

@@ -688,6 +688,23 @@ body {
   z-index: 10;
 }
 
+.archived-list {
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.archived-list .history-item {
+  height: 40px;
+}
+
+.archived-list .history-item .history-row {
+  padding-right: 68px;
+}
+
+.archived-list .history-actions {
+  display: flex;
+}
+
 .history-popover-heading {
   display: flex;
   align-items: center;

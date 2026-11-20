@@ -123,6 +123,10 @@ export function getPlan(planId: string, baseUrl = ''): Promise<CreatePlanRespons
   )
 }
 
+export function deletePlan(planId: string, baseUrl = ''): Promise<{ plan_id: string; deleted: boolean }> {
+  return requestJson(`${baseUrl}/api/plans/${encodeURIComponent(planId)}`, { method: 'DELETE' })
+}
+
 export function listSavedPlans(baseUrl = ''): Promise<SavedPlansResponse> {
   return requestJson<SavedPlansResponse>(`${baseUrl}/api/plans`, {
     method: 'GET',

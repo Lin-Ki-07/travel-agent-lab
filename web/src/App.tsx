@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
   createPlan,
+  deletePlan,
   getPreferences,
   getPlan,
   listSavedPlans,
@@ -93,6 +94,7 @@ export default function App() {
   const [defaultPreferences, setDefaultPreferences] = useState<string[]>([])
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
   const [openingPlanId, setOpeningPlanId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState(chats[0].id)
   const [saving, setSaving] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
@@ -238,6 +240,32 @@ export default function App() {
     })
   }
 
+  async function handleDeleteArchived(id: string, title: string, planId: string | null) {
+    if (deletingId || !window.confirm(`永久删除“${title}”？已保存的行程记录也会从本地数据库删除，且无法恢复。`)) return
+    setDeletingId(id)
+    try {
+      if (planId) await deletePlan(planId)
+      const removedChatIds = chats.filter((chat) => chat.id === id || chat.plan?.plan_id === id).map((chat) => chat.id)
+      const remaining = chats.filter((chat) => !removedChatIds.includes(chat.id))
+      const nextChats = remaining.length ? remaining : [createChat()]
+      setChats(nextChats)
+      if (removedChatIds.includes(selectedId)) {
+        setSelectedId(nextChats[0].id)
+      }
+      if (planId) {
+        setSavedPlans((prev) => prev.filter((plan) => plan.plan_id !== planId))
+        setSavedIds((prev) => { const next = new Set(prev); next.delete(planId); return next })
+      }
+      setPinnedIds((prev) => { const next = new Set(prev); next.delete(id); return next })
+      setArchivedIds((prev) => { const next = new Set(prev); next.delete(id); return next })
+      setNotice({ kind: 'success', text: `已永久删除“${title}”。` })
+    } catch (error) {
+      setNotice({ kind: 'error', text: `删除失败：${errorText(error, '请稍后重试。')}` })
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   function appendMessages(key: string, added: ChatMessage[]) {
     setChats((prev) => prev.map((chat) => chat.id === key
       ? { ...chat, messages: [...chat.messages, ...added] }
@@ -377,6 +405,8 @@ export default function App() {
           archivedIds={archivedIds}
           onTogglePin={(id) => setPinnedIds((current) => toggleId(current, id))}
           onToggleArchive={(id) => setArchivedIds((current) => toggleId(current, id))}
+          onDeleteArchived={handleDeleteArchived}
+          deletingId={deletingId}
           theme={theme}
           onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
           defaultPreferences={defaultPreferences}

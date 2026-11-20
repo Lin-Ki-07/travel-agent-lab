@@ -14,6 +14,8 @@ interface HistoryPanelProps {
   archivedIds: ReadonlySet<string>
   onTogglePin: (id: string) => void
   onToggleArchive: (id: string) => void
+  onDeleteArchived: (id: string, title: string, planId: string | null) => Promise<void>
+  deletingId: string | null
   theme: 'light' | 'dark'
   onToggleTheme: () => void
   defaultPreferences: string[]
@@ -35,6 +37,10 @@ function ArchiveIcon({ restore = false }: { restore?: boolean }) {
   return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/>{restore ? <path d="m9 15 3-3 3 3M12 12v6"/> : <path d="M10 13h4"/>}</svg>
 }
 
+function TrashIcon() {
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6m4-6v6"/></svg>
+}
+
 export default function HistoryPanel({
   chats,
   savedPlans,
@@ -47,6 +53,8 @@ export default function HistoryPanel({
   archivedIds,
   onTogglePin,
   onToggleArchive,
+  onDeleteArchived,
+  deletingId,
   theme,
   onToggleTheme,
   defaultPreferences,
@@ -145,14 +153,17 @@ export default function HistoryPanel({
               <strong>{bottomPanel === 'archive' ? '已归档聊天' : '默认旅行偏好'}</strong>
               <button type="button" aria-label="关闭面板" onClick={() => setBottomPanel(null)}>×</button>
             </div>
-            {bottomPanel === 'archive' ? archivedEntries.length ? <ul className="history-list">{archivedEntries.map((entry) => (
+            {bottomPanel === 'archive' ? archivedEntries.length ? <ul className="history-list archived-list">{archivedEntries.map((entry) => (
             <li key={entry.id} className="history-item">
               <button type="button" className="history-row" onClick={() => {
                 if (entry.chatId) onSelect(entry.chatId)
                 else onOpenSaved(entry.planId!)
                 setBottomPanel(null)
               }}>{entry.title}</button>
-              <span className="history-actions"><button type="button" title="取消归档" aria-label={`取消归档${entry.title}`} onClick={() => onToggleArchive(entry.id)}><ArchiveIcon restore /></button></span>
+              <span className="history-actions">
+                <button type="button" title="取消归档" aria-label={`取消归档${entry.title}`} disabled={deletingId === entry.id} onClick={() => onToggleArchive(entry.id)}><ArchiveIcon restore /></button>
+                <button type="button" title="永久删除" aria-label={`永久删除${entry.title}`} disabled={deletingId === entry.id} onClick={() => onDeleteArchived(entry.id, entry.title, entry.planId ?? chats.find((chat) => chat.id === entry.chatId)?.plan?.plan_id ?? null)}><TrashIcon /></button>
+              </span>
             </li>
           ))}</ul> : <p className="muted">暂无已归档聊天。</p> : preferencesLoaded ? (
               <PreferencesEditor key={defaultPreferences.join('\u0000')} preferences={defaultPreferences} onSaved={onPreferencesSaved} />

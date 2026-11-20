@@ -168,6 +168,17 @@ def update_itinerary(
             return cursor.rowcount == 1
 
 
+def delete_itinerary(plan_id: str, db_path: Path = DB_PATH) -> bool:
+    """按 ID 删除一条已保存行程；不存在时返回 False。"""
+    with closing(_connect(db_path)) as connection:
+        with connection:
+            cursor = connection.execute(
+                "DELETE FROM saved_plans WHERE plan_id = ?",
+                (plan_id,),
+            )
+            return cursor.rowcount == 1
+
+
 def load_preferences(db_path: Path = DB_PATH) -> list[str]:
     with closing(_connect(db_path)) as connection:
         row = connection.execute(

@@ -118,6 +118,12 @@ start_date、days、generated_at、saved_at，按保存时间倒序排列。
 plan_id、itinerary 和 map_days 结构；map_days 从读取的行程重新派生。
 未知或未保存的 ID 返回 404。
 
+## DELETE /api/plans/{plan_id}
+
+永久删除指定行程。已保存的行程从 `data/trips.db` 删除；当前进程中未保存的生成结果也可按 ID 删除。
+成功返回 `{"plan_id":"...","deleted":true}`；ID 不存在返回 404。删除后列表与按 ID 读取不再返回该行程。
+前端仅在归档面板中提供此操作，确认后执行；删除无法撤销。
+
 ## PUT /api/plans/{plan_id}/days/{day_number}
 
 只编辑已保存行程的某一天。请求提供当天完整的 `activities` 和 `transport_segments`：
@@ -151,7 +157,7 @@ GET 返回 `{"preferences":["美食"]}`，未设置时为空列表。PUT 请求�
 
 已保存行程跨后端重启有效，未保存生成结果仅在当前进程暂存。
 数据库位于被 Git 忽略的 `data/trips.db`，与 CLI 记忆数据库分开；记录含 `schema_version=1`。
-本版没有删除、账号或多用户隔离。
+本版支持按 ID 删除行程；没有账号或多用户隔离。
 
 网页聊天标题、消息和草稿只保留在页面内存中。刷新后可通过列表与 GET 重新打开已保存行程，
 不会恢复完整聊天或未保存草稿；重启后端不主动清除页面已有快照。
