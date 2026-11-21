@@ -3,6 +3,7 @@ import type { MapDay, MapStop } from './types'
 
 export interface MarkerSpec {
   order: number
+  placeId: string
   name: string
   position: [number, number]
 }
@@ -32,7 +33,7 @@ export function buildOverlaySpec(day: MapDay): DayOverlaySpec {
   const markers: MarkerSpec[] = [...day.stops]
     .sort((a: MapStop, b: MapStop) => a.order - b.order)
     .filter((stop) => isValidPosition(stop.position))
-    .map((stop) => ({ order: stop.order, name: stop.name, position: stop.position }))
+    .map((stop) => ({ order: stop.order, placeId: stop.place_id, name: stop.name, position: stop.position }))
 
   const path = day.line.positions.filter(isValidPosition)
 

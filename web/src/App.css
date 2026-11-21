@@ -262,6 +262,24 @@ body {
   transform: rotate(45deg);
 }
 
+.numbered-map-pin-target {
+  background: #c53d46;
+}
+
+.candidate-map-pin {
+  border: 2px solid #fff;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #25845a;
+  box-shadow: 0 2px 5px #0005;
+  color: #fff;
+  cursor: pointer;
+}
+
+.candidate-map-pin.selected {
+  outline: 3px solid #f2b84a;
+}
+
 .line-note {
   font-size: 0.85rem;
   opacity: 0.85;
@@ -361,6 +379,18 @@ body {
 .activity-choice-actions span {
   width: 100%;
   font-size: 0.85rem;
+}
+
+.activity-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.activity-candidates button[aria-pressed="true"] {
+  background: #25845a;
+  color: #fff;
 }
 
 .activity-bridge-mode {

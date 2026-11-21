@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { loadAmap, readAmapConfig, type AMapMap, type AMapNamespace } from './amapLoader'
 import { buildOverlaySpec, clampDayIndex } from './mapModel'
-import type { MapDay } from './types'
+import type { MapDay, Place } from './types'
+import type { ActivityTarget } from './editIntent'
 
 interface MapPanelProps {
   // 没有行程时传入空数组：地图仍显示（全国视野），但不绘制标记和示意线。
   days: MapDay[]
+  preview?: { target: ActivityTarget; candidates: Place[]; selectedId?: string }
+  onSelectCandidate?: (placeId: string) => void
 }
 
 type MapStatus =
@@ -16,7 +19,7 @@ type MapStatus =
 
 const DEFAULT_CENTER: [number, number] = [104.1, 35.9]
 
-export default function MapPanel({ days }: MapPanelProps) {
+export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelProps) {
   const [dayIndex, setDayIndex] = useState(0)
   // 没有 Key 时直接进入 no-key 状态，不加载脚本，effect 内无需同步 setState。
   const [status, setStatus] = useState<MapStatus>(() =>
@@ -85,6 +88,9 @@ export default function MapPanel({ days }: MapPanelProps) {
     spec.markers.forEach((marker) => {
       const pin = document.createElement('div')
       pin.className = 'numbered-map-pin'
+      if (preview?.target.dayNumber === currentDay.day_number && marker.order === preview.target.activityIndex + 1 && marker.placeId === preview.target.placeId) {
+        pin.classList.add('numbered-map-pin-target')
+      }
       const number = document.createElement('span')
       number.textContent = String(marker.order)
       pin.appendChild(number)
@@ -97,6 +103,22 @@ export default function MapPanel({ days }: MapPanelProps) {
         }),
       )
     })
+
+    if (preview?.target.dayNumber === currentDay.day_number) {
+      preview.candidates.forEach((place) => {
+        const pin = document.createElement('button')
+        pin.type = 'button'
+        pin.className = `candidate-map-pin${preview.selectedId === place.place_id ? ' selected' : ''}`
+        pin.textContent = place.name
+        pin.setAttribute('aria-label', `选择候选地点 ${place.name}`)
+        pin.addEventListener('click', () => onSelectCandidate?.(place.place_id))
+        overlays.push(new AMap.Marker({
+          position: [place.longitude, place.latitude],
+          title: place.name,
+          content: pin,
+        }))
+      })
+    }
 
     if (spec.path.length >= 2) {
       overlays.push(
@@ -115,7 +137,7 @@ export default function MapPanel({ days }: MapPanelProps) {
       map.add(overlays)
       map.setFitView(overlays, false, [40, 40, 40, 40])
     }
-  }, [currentDay, status.kind])
+  }, [currentDay, status.kind, preview, onSelectCandidate])
 
   const overlayMessage =
     status.kind === 'no-key'
@@ -145,6 +167,8 @@ export default function MapPanel({ days }: MapPanelProps) {
             ))}
           </div>
           {currentDay && <p className="muted">{currentDay.plan_date}</p>}
+          {preview && currentDay?.day_number === preview.target.dayNumber && <p className="muted">红色：待替换地点　绿色：候选地点；点击候选只预览，不保存。</p>}
+          {preview && currentDay?.day_number !== preview.target.dayNumber && <p className="muted">候选预览在第 {preview.target.dayNumber} 天，切换到该日可查看。</p>}
         </>
       )}
 

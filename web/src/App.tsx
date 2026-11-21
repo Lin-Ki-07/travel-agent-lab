@@ -22,6 +22,7 @@ import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
 import { findReplacementTargets, type ActivityTarget } from './editIntent'
 import { needsBridgeMode, prepareActivityRemoval } from './removeActivity'
+import { replacementCandidates } from './replacementCandidates'
 import { formatParseReply, mergeParsedFields, missingTripFields, summarizeTripFields, toRequestBody, validateTripForm, type TripFormValues } from './tripRequest'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
@@ -31,7 +32,7 @@ interface ChatMessage {
   text: string
   planCard?: boolean
   pending?: boolean
-  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives'; bridgeMode?: string; busy?: boolean; feedback?: string }
+  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives'; candidateId?: string; bridgeMode?: string; busy?: boolean; feedback?: string }
 }
 
 interface Chat {
@@ -286,9 +287,15 @@ export default function App() {
       void removeChosenActivity(chatId, messageIndex)
       return
     }
+    const chat = chats.find((item) => item.id === chatId)
+    const choice = chat?.messages[messageIndex]?.activityChoice
+    if (!choice || !chat?.plan || choice.selected) return
+    const candidates = replacementCandidates(chat.plan.itinerary, choice.target)
     setChats((prev) => prev.map((chat) => chat.id === chatId
       ? { ...chat, messages: chat.messages.map((message, index) => index === messageIndex && message.activityChoice
-        ? { ...message, activityChoice: { ...message.activityChoice, selected: action } }
+        ? { ...message, activityChoice: { ...message.activityChoice, selected: action, feedback: candidates.length
+          ? '可在下方或地图上选择一个候选地点；行程尚未修改。'
+          : '这份行程没有其他可用地点；后续步骤再补充搜索。' } }
         : message) }
       : chat))
   }
@@ -452,6 +459,18 @@ export default function App() {
   }
 
   const gridColumns = `${leftWidth}px ${HANDLE_WIDTH}px minmax(${CENTER_MIN}px, 1fr) ${HANDLE_WIDTH}px ${rightWidth}px`
+  const latestChoice = [...currentChat.messages].reverse().find((message) => message.activityChoice)?.activityChoice
+  const activeChoice = latestChoice?.selected === 'alternatives' ? latestChoice : undefined
+  const previewCandidates = selected && activeChoice ? replacementCandidates(selected.itinerary, activeChoice.target) : []
+  const previewTarget = selected && activeChoice && selected.itinerary.daily_plans
+    .find((day) => day.day_number === activeChoice.target.dayNumber)?.activities[activeChoice.target.activityIndex]?.place_id === activeChoice.target.placeId
+    ? activeChoice.target : null
+
+  function selectPreviewCandidate(placeId: string) {
+    const messageIndex = currentChat.messages.findLastIndex((message) => message.activityChoice === activeChoice)
+    if (messageIndex < 0 || !previewCandidates.some((place) => place.place_id === placeId)) return
+    patchActivityChoice(currentChat.id, messageIndex, { candidateId: placeId })
+  }
 
   return (
     <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
@@ -538,6 +557,16 @@ export default function App() {
                     {message.activityChoice.selected && (
                       <span role="status">{message.activityChoice.selected === 'remove' ? '已从行程中去掉，地图已同步。' : '已选择看看其他地点；行程尚未修改。'}</span>
                     )}
+                    {selected && message.activityChoice.selected === 'alternatives' && (
+                      <div className="activity-candidates">
+                        {replacementCandidates(selected.itinerary, message.activityChoice.target).map((place) => (
+                          <button key={place.place_id} type="button"
+                            aria-pressed={message.activityChoice?.candidateId === place.place_id}
+                            onClick={() => patchActivityChoice(currentChat.id, index, { candidateId: place.place_id })}>{place.name}</button>
+                        ))}
+                        <span>{message.activityChoice.feedback}</span>
+                      </div>
+                    )}
                     {message.activityChoice.busy && <span role="status">正在更新行程…</span>}
                     {message.activityChoice.feedback && !message.activityChoice.selected && <span role="status">{message.activityChoice.feedback}</span>}
                   </div>
@@ -574,7 +603,9 @@ export default function App() {
 
       <section className="pane pane-map" aria-label="地图">
         <h2>地图</h2>
-        <MapPanel key={selected?.plan_id ?? 'empty'} days={selected?.map_days ?? []} />
+        <MapPanel key={selected?.plan_id ?? 'empty'} days={selected?.map_days ?? []}
+          preview={previewTarget ? { target: previewTarget, candidates: previewCandidates, selectedId: activeChoice?.candidateId } : undefined}
+          onSelectCandidate={selectPreviewCandidate} />
       </section>
     </div>
   )
