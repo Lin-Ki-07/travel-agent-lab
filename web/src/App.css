@@ -336,6 +336,33 @@ body {
   background: #8882;
 }
 
+.activity-choice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.activity-choice-actions button {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.activity-choice-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.activity-choice-actions span {
+  width: 100%;
+  font-size: 0.85rem;
+}
+
 .chat-scroll > .chat-bubble {
   margin-top: 12px;
 }

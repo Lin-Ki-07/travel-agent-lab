@@ -20,7 +20,7 @@ import PlanResultView from './PlanResultView'
 import MapPanel from './MapPanel'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
-import { findReplacementTargets } from './editIntent'
+import { findReplacementTargets, type ActivityTarget } from './editIntent'
 import { formatParseReply, mergeParsedFields, missingTripFields, summarizeTripFields, toRequestBody, validateTripForm, type TripFormValues } from './tripRequest'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
@@ -30,6 +30,7 @@ interface ChatMessage {
   text: string
   planCard?: boolean
   pending?: boolean
+  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives' }
 }
 
 interface Chat {
@@ -278,6 +279,14 @@ export default function App() {
       : chat))
   }
 
+  function chooseActivityAction(chatId: string, messageIndex: number, action: 'remove' | 'alternatives') {
+    setChats((prev) => prev.map((chat) => chat.id === chatId
+      ? { ...chat, messages: chat.messages.map((message, index) => index === messageIndex && message.activityChoice
+        ? { ...message, activityChoice: { ...message.activityChoice, selected: action } }
+        : message) }
+      : chat))
+  }
+
   async function handleSend(text: string) {
     const chatId = currentChat.id
     if (sendingChats.current.has(chatId)) return
@@ -287,17 +296,19 @@ export default function App() {
     if (selected) {
       const targets = findReplacementTargets(text, selected.itinerary)
       let reply = '这是已生成的行程。要规划新的行程，请点击左侧“＋ 新聊天”。'
+      let activityChoice: ChatMessage['activityChoice']
       if (targets) {
         if (targets.length === 1) {
           const target = targets[0]
-          reply = `我找到了第 ${target.dayNumber} 天的“${target.placeName}”（第 ${target.activityIndex + 1} 项）。你想替换这个地点。接下来可以提供候选地点并在地图上预览；现在行程尚未修改。`
+          reply = `第 ${target.dayNumber} 天的“${target.placeName}”（第 ${target.activityIndex + 1} 项）不想去了。你想直接去掉，还是看看其他地点？`
+          activityChoice = { target }
         } else if (targets.length > 1) {
           reply = `找到多个可能的活动：${targets.map((target) => `第 ${target.dayNumber} 天第 ${target.activityIndex + 1} 项“${target.placeName}”`).join('、')}。请指出要替换哪一项；现在行程尚未修改。`
         } else {
           reply = '我还无法确定你想替换的地点。请直接说出行程中的地点名称，例如“我不想去太平府”；现在行程尚未修改。'
         }
       }
-      appendMessages(chatId, [{ role: 'user', text }, { role: 'assistant', text: reply }])
+      appendMessages(chatId, [{ role: 'user', text }, { role: 'assistant', text: reply, activityChoice }])
       return
     }
 
@@ -457,6 +468,17 @@ export default function App() {
             ) : (
               <div key={index} className={`chat-bubble ${message.role}`}>
                 {message.text}
+                {message.activityChoice && (
+                  <div className="activity-choice-actions" aria-label="活动处理方式">
+                    <button type="button" disabled={Boolean(message.activityChoice.selected)}
+                      onClick={() => chooseActivityAction(currentChat.id, index, 'remove')}>直接去掉</button>
+                    <button type="button" disabled={Boolean(message.activityChoice.selected)}
+                      onClick={() => chooseActivityAction(currentChat.id, index, 'alternatives')}>看看其他地点</button>
+                    {message.activityChoice.selected && (
+                      <span role="status">已选择{message.activityChoice.selected === 'remove' ? '直接去掉' : '看看其他地点'}；行程尚未修改。</span>
+                    )}
+                  </div>
+                )}
               </div>
             )
           ))}
