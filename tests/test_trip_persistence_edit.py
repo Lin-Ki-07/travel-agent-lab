@@ -101,6 +101,21 @@ class TripPersistenceEditTests(unittest.TestCase):
                     edit_day(load_itinerary("plan-1", self.db), 1, body)
                 self.assertEqual(load_itinerary("plan-1", self.db), self.trip)
 
+    def test_removing_activity_persists_and_updates_map_stops(self):
+        save_itinerary("plan-1", self.trip, self.db)
+        edited = edit_day(load_itinerary("plan-1", self.db), 1, {
+            "activities": [
+                {"place_id": "P2", "description": "下午", "start_time": "11:00", "end_time": "12:00"},
+            ],
+            "transport_segments": [],
+        })
+        self.assertTrue(update_itinerary("plan-1", edited, self.db))
+
+        restored = load_itinerary("plan-1", self.db)
+        self.assertEqual([activity.place_id for activity in restored.daily_plans[0].activities], ["P2"])
+        self.assertEqual(restored.daily_plans[0].transport_segments, [])
+        self.assertEqual([stop["place_id"] for stop in build_map_days(restored)[0]["stops"]], ["P2"])
+
     def test_preferences_are_independent_of_saved_trip(self):
         save_itinerary("plan-1", self.trip, self.db)
         self.assertEqual(load_preferences(self.db), [])
