@@ -124,7 +124,13 @@ export function getPlan(planId: string, baseUrl = ''): Promise<CreatePlanRespons
 }
 
 export function deletePlan(planId: string, baseUrl = ''): Promise<{ plan_id: string; deleted: boolean }> {
-  return requestJson(`${baseUrl}/api/plans/${encodeURIComponent(planId)}`, { method: 'DELETE' })
+  return requestJson<{ plan_id: string; deleted: boolean }>(`${baseUrl}/api/plans/${encodeURIComponent(planId)}`, { method: 'DELETE' })
+    .catch((error: unknown) => {
+      if (error instanceof PlanApiError && error.status === 405) {
+        throw new PlanApiError('当前后端尚未加载删除接口。请重启 uvicorn 后重试。', 405)
+      }
+      throw error
+    })
 }
 
 export function listSavedPlans(baseUrl = ''): Promise<SavedPlansResponse> {

@@ -292,7 +292,7 @@ export default function App() {
           const target = targets[0]
           reply = `我找到了第 ${target.dayNumber} 天的“${target.placeName}”（第 ${target.activityIndex + 1} 项）。你想替换这个地点。接下来可以提供候选地点并在地图上预览；现在行程尚未修改。`
         } else if (targets.length > 1) {
-          reply = `“${targets[0].placeName}”在行程中出现多次：${targets.map((target) => `第 ${target.dayNumber} 天第 ${target.activityIndex + 1} 项`).join('、')}。请指出要替换哪一项；现在行程尚未修改。`
+          reply = `找到多个可能的活动：${targets.map((target) => `第 ${target.dayNumber} 天第 ${target.activityIndex + 1} 项“${target.placeName}”`).join('、')}。请指出要替换哪一项；现在行程尚未修改。`
         } else {
           reply = '我还无法确定你想替换的地点。请直接说出行程中的地点名称，例如“我不想去太平府”；现在行程尚未修改。'
         }
