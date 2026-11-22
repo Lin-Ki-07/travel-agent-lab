@@ -272,7 +272,7 @@ body {
 }
 
 .candidate-map-pin.selected {
-  outline: 3px solid #f2b84a;
+  background: #ef8b2c;
 }
 
 .line-note {
