@@ -108,14 +108,14 @@ export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelP
       preview.candidates.forEach((place) => {
         const pin = document.createElement('button')
         pin.type = 'button'
-        pin.className = `candidate-map-pin${preview.selectedId === place.place_id ? ' selected' : ''}`
-        pin.textContent = place.name
+        pin.className = `numbered-map-pin candidate-map-pin${preview.selectedId === place.place_id ? ' selected' : ''}`
         pin.setAttribute('aria-label', `选择候选地点 ${place.name}`)
         pin.addEventListener('click', () => onSelectCandidate?.(place.place_id))
         overlays.push(new AMap.Marker({
           position: [place.longitude, place.latitude],
           title: place.name,
           content: pin,
+          offset: new AMap.Pixel(-16, -42),
         }))
       })
     }
