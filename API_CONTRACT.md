@@ -145,6 +145,27 @@ GET 返回 `{"preferences":["美食"]}`，未设置时为空列表。PUT 请求�
 空列表可清除；最多 20 项，每项去除首尾空白后为 1–100 个字符。无效输入返回 422。
 默认偏好与行程中本次实际采用的偏好分别保存，修改默认值不改写旧行程。
 
+## v0.7.0 对话响应协议（尚未接入 API）
+
+`core/chat_contract.py` 定义后续对话接口使用的数据结构。本步只建立协议，
+当前网页发送消息的行为和现有 API 路由均未改变。
+
+请求包含 `text`（本条用户消息）、可选 `plan_id`（当前行程）和 `history`
+（按顺序排列的 `{role, content}`，role 只能为 `user` 或 `assistant`）。
+响应以 `kind` 区分三种结果：
+
+- `answer`：`{"kind":"answer","message":"..."}`，普通回答。
+- `clarify`：`{"kind":"clarify","message":"..."}`，请求用户澄清。
+- `edit_draft`：含 `message` 和 `draft` 的修改建议；`draft` 指明
+  `plan_id`、从 1 开始的 `day_number`、从 0 开始的 `activity_index`、
+  `original_place_id`、`candidate_place_id`，以及拟替换当天的完整
+  `activities` 和 `transport_segments`。
+
+此协议只检查响应的类型、必需字段和基本取值。草案中的地点是否属于行程、
+目标活动是否仍一致、时间和交通连接是否合法，须在后续步骤用当前已保存行程
+重新校验。`edit_draft` 不是保存指令；生成草案不写数据库，也不更新地图。
+确认保存的接口和状态校验将在 7.3 单独设计。
+
 ## 错误
 
 输入无效：422，返回 {"detail": "可读的具体原因"}。
