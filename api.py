@@ -4,8 +4,13 @@ from uuid import uuid4
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
+from pydantic import ValidationError
 
+from agents.conversation_agent import ConversationAgent
+from core.chat_contract import ChatRequest
+from core.chat_service import reply_to_chat
 from core.config import LLMConfig
+from core.exceptions import LLMError
 from core.trip_edit import edit_day
 from core.llm_client import OpenAICompatibleClient
 from core.trip_models import Itinerary
@@ -73,6 +78,27 @@ def parse_request(raw_request: dict[str, str]) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.post("/api/chat")
+def chat(raw_request: dict) -> dict:
+    """回答普通问题；编辑草案和保存留待后续步骤。"""
+    try:
+        request = ChatRequest.model_validate(raw_request)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors(include_context=False)) from exc
+
+    itinerary = None
+    if request.plan_id is not None:
+        itinerary = load_itinerary(request.plan_id) or generated_plans.get(request.plan_id)
+        if itinerary is None:
+            raise HTTPException(status_code=404, detail="行程不存在")
+
+    try:
+        response = reply_to_chat(ConversationAgent(create_llm()), request, itinerary)
+    except (LLMError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return response.model_dump(mode="json")
 
 
 @app.get("/api/preferences")

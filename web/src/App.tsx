@@ -9,6 +9,7 @@ import {
   parseRequest,
   PlanApiError,
   savePlan,
+  sendChat,
   updatePlanDay,
   type CreatePlanResponse,
   type EditDayRequest,
@@ -351,12 +352,12 @@ export default function App() {
     if (sendingChats.current.has(chatId)) return
     updateChat(chatId, { draft: '' })
 
-    // 已生成行程：先定位明确提出要替换的活动，暂不修改行程。
+    // 已生成行程：编辑请求走现有定位，其他消息进入自然对话。
     if (selected) {
       const targets = findReplacementTargets(text, selected.itinerary)
-      let reply = '这是已生成的行程。要规划新的行程，请点击左侧“＋ 新聊天”。'
-      let activityChoice: ChatMessage['activityChoice']
       if (targets) {
+        let reply = ''
+        let activityChoice: ChatMessage['activityChoice']
         if (targets.length === 1) {
           const target = targets[0]
           reply = `第 ${target.dayNumber} 天的“${target.placeName}”（第 ${target.activityIndex + 1} 项）不想去了。你想直接去掉，还是看看其他地点？`
@@ -366,8 +367,26 @@ export default function App() {
         } else {
           reply = '我还无法确定你说的是行程中的哪个地点。请说出该地点的名称，或指出它在第几天的第几项；现在行程尚未修改。'
         }
+        appendMessages(chatId, [{ role: 'user', text }, { role: 'assistant', text: reply, activityChoice }])
+        return
       }
-      appendMessages(chatId, [{ role: 'user', text }, { role: 'assistant', text: reply, activityChoice }])
+
+      const history = currentChat.messages
+        .filter((message) => !message.pending && !message.planCard && message.text)
+        .slice(-12)
+        .map((message) => ({ role: message.role, content: message.text }))
+      appendMessages(chatId, [{ role: 'user', text }])
+      sendingChats.current.add(chatId)
+      updateChat(chatId, { parsing: true })
+      try {
+        const result = await sendChat(text, selected.plan_id, history)
+        appendMessages(chatId, [{ role: 'assistant', text: result.message }])
+      } catch (error) {
+        appendMessages(chatId, [{ role: 'assistant', text: `处理失败：${errorText(error, '请稍后重试。')}` }])
+      } finally {
+        sendingChats.current.delete(chatId)
+        updateChat(chatId, { parsing: false })
+      }
       return
     }
 

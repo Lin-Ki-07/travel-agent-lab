@@ -33,6 +33,24 @@ export interface ParseRequestResponse {
   summary: string
 }
 
+export interface ChatResponse {
+  kind: 'answer' | 'clarify'
+  message: string
+}
+
+export function sendChat(
+  text: string,
+  planId: string | null,
+  history: { role: 'user' | 'assistant'; content: string }[],
+  baseUrl = '',
+): Promise<ChatResponse> {
+  return requestJson<ChatResponse>(`${baseUrl}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, plan_id: planId, history }),
+  })
+}
+
 export class PlanApiError extends Error {
   readonly status: number | null
 
