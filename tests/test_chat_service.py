@@ -1,5 +1,6 @@
 import json
 import unittest
+from dataclasses import replace
 from datetime import date, datetime, time, timezone
 from unittest.mock import patch
 
@@ -39,6 +40,40 @@ def sample_itinerary():
 
 
 class ChatServiceTests(unittest.TestCase):
+    def test_summary_numbers_repeated_places_and_read_only_target(self):
+        itinerary = sample_itinerary()
+        day_one = replace(itinerary.daily_plans[0], activities=[
+            Activity("P1", "上午游览", time(9), time(10)),
+            Activity("P2", "下午游览", time(14), time(15)),
+        ])
+        day_two = replace(
+            day_one, day_number=2, plan_date=date(2026, 11, 25),
+            weather=replace(day_one.weather, forecast_date=date(2026, 11, 25)),
+            activities=[Activity("P1", "再次游览", time(9), time(10))],
+        )
+        itinerary = replace(
+            itinerary,
+            request=replace(itinerary.request, days=2),
+            places=[*itinerary.places, Place("P2", "九峰公园", "示例地址", 28.1, 121.1, "amap", itinerary.generated_at)],
+            daily_plans=[day_one, day_two],
+        )
+        output = json.dumps({
+            "kind": "edit_target", "message": "已定位目标，尚未修改行程",
+            "target": {"day_number": 2, "activity_index": 0, "place_id": "P1"},
+        }, ensure_ascii=False)
+        fake = FakeLLM(output)
+        with (
+            patch("api.load_itinerary", return_value=itinerary),
+            patch("api.create_llm", return_value=fake),
+            patch("api.update_itinerary") as update,
+        ):
+            response = api.chat({"text": "把第二天第一项换掉", "plan_id": "saved-plan"})
+        self.assertEqual(response["kind"], "edit_target")
+        self.assertIn("第 2 天", fake.messages[-2].content)
+        self.assertIn("activity_index=0，place_id=P1", fake.messages[-2].content)
+        self.assertEqual(itinerary.daily_plans[1].activities[0].place_id, "P1")
+        update.assert_not_called()
+
     def test_answer_uses_current_itinerary_without_writing(self):
         itinerary = sample_itinerary()
         fake = FakeLLM(json.dumps({"kind": "answer", "message": "第一天有合胜广场。"}, ensure_ascii=False))

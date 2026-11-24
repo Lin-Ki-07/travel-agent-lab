@@ -355,7 +355,7 @@ export default function App() {
     // 已生成行程：编辑请求走现有定位，其他消息进入自然对话。
     if (selected) {
       const targets = findReplacementTargets(text, selected.itinerary)
-      if (targets) {
+      if (targets && targets.length > 0) {
         let reply = ''
         let activityChoice: ChatMessage['activityChoice']
         if (targets.length === 1) {
@@ -364,8 +364,6 @@ export default function App() {
           activityChoice = { target }
         } else if (targets.length > 1) {
           reply = `找到多个可能的活动：${targets.map((target) => `第 ${target.dayNumber} 天第 ${target.activityIndex + 1} 项“${target.placeName}”`).join('、')}。请指出要替换哪一项；现在行程尚未修改。`
-        } else {
-          reply = '我还无法确定你说的是行程中的哪个地点。请说出该地点的名称，或指出它在第几天的第几项；现在行程尚未修改。'
         }
         appendMessages(chatId, [{ role: 'user', text }, { role: 'assistant', text: reply, activityChoice }])
         return
