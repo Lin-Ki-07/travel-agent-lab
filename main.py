@@ -10,9 +10,7 @@ from core.config import AgentConfig, LLMConfig
 from core.exceptions import LLMError
 from core.trip_service import plan_trip
 
-from tools.weather_tool import WeatherTool
-from tools.registry import ToolRegistry, ToolParameter
-from tools.attraction_tool import search_travel_evidence
+from agents.travel_tools import create_travel_tool_registry
 from tools.memory_tool import MemoryTool
 
 from agents.react_agent import ReActAgent
@@ -28,22 +26,8 @@ with open("prompts/system_prompt.md", "r", encoding="utf-8") as f:
     AGENT_SYSTEM_PROMPT = f.read()
 
 # 注册工具
-tool_registry = ToolRegistry()
-
-tool_registry.register_tool(WeatherTool())
-
-tool_registry.register_function(
-    name="search_travel_evidence",
-    func=search_travel_evidence,
-    description="按旅行问题搜索网页资料，返回编号、标题、URL 和文本证据",
-    parameters=[
-        ToolParameter(
-            name="question",
-            type="string",
-            description="需要检索的完整旅行问题",
-        ),
-    ],
-)
+# CLI 和 Web 共用只读旅行工具；CLI 启动后再追加记忆工具。
+tool_registry = create_travel_tool_registry()
 
 # 启动入口
 if __name__ == "__main__":
