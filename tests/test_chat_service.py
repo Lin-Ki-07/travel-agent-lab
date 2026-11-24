@@ -73,3 +73,25 @@ class ChatServiceTests(unittest.TestCase):
         with patch("api.create_llm", return_value=fake):
             response = api.chat({"text": "想调整行程"})
         self.assertEqual(response["kind"], "clarify")
+
+    def test_edit_target_must_match_current_itinerary(self):
+        itinerary = sample_itinerary()
+        for day_number, activity_index, place_id, expected in (
+            (1, 0, "P1", "edit_target"),
+            (1, 0, "missing", "clarify"),
+            (2, 0, "P1", "clarify"),
+            (1, 4, "P1", "clarify"),
+        ):
+            output = json.dumps({
+                "kind": "edit_target", "message": "已定位，尚未修改行程",
+                "target": {"day_number": day_number, "activity_index": activity_index, "place_id": place_id},
+            }, ensure_ascii=False)
+            with self.subTest(target=(day_number, activity_index, place_id)):
+                with (
+                    patch("api.load_itinerary", return_value=itinerary),
+                    patch("api.create_llm", return_value=FakeLLM(output)),
+                    patch("api.update_itinerary") as update,
+                ):
+                    response = api.chat({"text": "换掉这项", "plan_id": "saved-plan"})
+                self.assertEqual(response["kind"], expected)
+                update.assert_not_called()

@@ -152,10 +152,13 @@ GET 返回 `{"preferences":["美食"]}`，未设置时为空列表。PUT 请求�
 
 请求包含 `text`（本条用户消息）、可选 `plan_id`（当前行程）和 `history`
 （按顺序排列的 `{role, content}`，role 只能为 `user` 或 `assistant`）。
-响应以 `kind` 区分三种结果：
+响应以 `kind` 区分四种结果：
 
 - `answer`：`{"kind":"answer","message":"..."}`，普通回答。
 - `clarify`：`{"kind":"clarify","message":"..."}`，请求用户澄清。
+- `edit_target`：含 `message` 和 `target`；`target` 指明从 1 开始的
+  `day_number`、从 0 开始的 `activity_index` 及 `place_id`。后端用当前
+  行程核对三者，目标不存在或不一致时返回 `clarify`，不修改行程。
 - `edit_draft`：含 `message` 和 `draft` 的修改建议；`draft` 指明
   `plan_id`、从 1 开始的 `day_number`、从 0 开始的 `activity_index`、
   `original_place_id`、`candidate_place_id`，以及拟替换当天的完整
@@ -166,7 +169,7 @@ GET 返回 `{"preferences":["美食"]}`，未设置时为空列表。PUT 请求�
 重新校验。`edit_draft` 不是保存指令；生成草案不写数据库，也不更新地图。
 确认保存的接口和状态校验将在 7.3 单独设计。
 
-当前接口只返回 `answer` 或 `clarify`，不会返回 `edit_draft`；模型输出非法
+当前接口只返回 `answer`、`clarify` 或已核对的 `edit_target`，不会返回 `edit_draft`；模型输出非法
 或模型调用失败返回 502。`plan_id` 未找到时返回 404。接口只读取行程，
 不写数据库或更新地图。网页仍在本地内存保存聊天历史；未生成行程的新聊天
 继续使用原需求解析流程，尚未接入此自然对话接口。

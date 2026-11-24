@@ -34,8 +34,9 @@ export interface ParseRequestResponse {
 }
 
 export interface ChatResponse {
-  kind: 'answer' | 'clarify'
+  kind: 'answer' | 'clarify' | 'edit_target'
   message: string
+  target?: { day_number: number; activity_index: number; place_id: string }
 }
 
 export function sendChat(

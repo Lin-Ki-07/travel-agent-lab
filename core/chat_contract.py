@@ -30,6 +30,18 @@ class ClarifyResponse(ContractModel):
     message: str = Field(min_length=1)
 
 
+class ActivityTarget(ContractModel):
+    day_number: int = Field(ge=1)
+    activity_index: int = Field(ge=0)
+    place_id: str = Field(min_length=1)
+
+
+class EditTargetResponse(ContractModel):
+    kind: Literal["edit_target"] = "edit_target"
+    message: str = Field(min_length=1)
+    target: ActivityTarget
+
+
 class DraftActivity(ContractModel):
     place_id: str = Field(min_length=1)
     description: str = Field(min_length=1)
@@ -67,7 +79,7 @@ class EditDraftResponse(ContractModel):
 
 
 ChatResponse = Annotated[
-    AnswerResponse | ClarifyResponse | EditDraftResponse,
+    AnswerResponse | ClarifyResponse | EditTargetResponse | EditDraftResponse,
     Field(discriminator="kind"),
 ]
 chat_response_adapter = TypeAdapter(ChatResponse)

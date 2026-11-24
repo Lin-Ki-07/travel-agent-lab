@@ -380,7 +380,24 @@ export default function App() {
       updateChat(chatId, { parsing: true })
       try {
         const result = await sendChat(text, selected.plan_id, history)
-        appendMessages(chatId, [{ role: 'assistant', text: result.message }])
+        if (result.kind === 'edit_target' && result.target) {
+          const day = selected.itinerary.daily_plans.find((item) => item.day_number === result.target!.day_number)
+          const activity = day?.activities[result.target.activity_index]
+          const place = selected.itinerary.places.find((item) => item.place_id === result.target!.place_id)
+          if (activity?.place_id === result.target.place_id && place) {
+            const target: ActivityTarget = {
+              dayNumber: result.target.day_number,
+              activityIndex: result.target.activity_index,
+              placeId: result.target.place_id,
+              placeName: place.name,
+            }
+            appendMessages(chatId, [{ role: 'assistant', text: `第 ${target.dayNumber} 天的“${target.placeName}”（第 ${target.activityIndex + 1} 项）不想去了。你想直接去掉，还是看看其他地点？`, activityChoice: { target } }])
+          } else {
+            appendMessages(chatId, [{ role: 'assistant', text: '行程已变化，请重新说明要调整的地点。' }])
+          }
+        } else {
+          appendMessages(chatId, [{ role: 'assistant', text: result.message }])
+        }
       } catch (error) {
         appendMessages(chatId, [{ role: 'assistant', text: `处理失败：${errorText(error, '请稍后重试。')}` }])
       } finally {
