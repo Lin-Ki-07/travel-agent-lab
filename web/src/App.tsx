@@ -24,7 +24,7 @@ import MapPanel from './MapPanel'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
 import { findReplacementTargets, type ActivityTarget } from './editIntent'
-import { needsBridgeMode, prepareActivityRemoval } from './removeActivity'
+import { prepareActivityRemoval } from './removeActivity'
 import { replacementCandidates } from './replacementCandidates'
 import { formatParseReply, mergeParsedFields, missingTripFields, summarizeTripFields, toRequestBody, validateTripForm, type TripFormValues } from './tripRequest'
 
@@ -35,7 +35,7 @@ interface ChatMessage {
   text: string
   planCard?: boolean
   pending?: boolean
-  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives'; candidateId?: string; bridgeMode?: string; busy?: boolean; feedback?: string }
+  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives'; candidateId?: string; busy?: boolean; feedback?: string }
 }
 
 interface Chat {
@@ -361,15 +361,10 @@ export default function App() {
       patchActivityChoice(chatId, messageIndex, { feedback: '当天至少需要保留一项活动，不能直接去掉。' })
       return
     }
-    if (needsBridgeMode(day, target.activityIndex) && !choice.bridgeMode?.trim()) {
-      patchActivityChoice(chatId, messageIndex, { feedback: '请填写删掉该活动后新连接的交通方式。' })
-      return
-    }
-
     removingPlans.current.add(plan.plan_id)
     patchActivityChoice(chatId, messageIndex, { busy: true, feedback: '' })
     try {
-      const body = prepareActivityRemoval(day, target.activityIndex, choice.bridgeMode ?? '')
+      const body = prepareActivityRemoval(day, target.activityIndex)
       const updated = await updatePlanDay(plan.plan_id, target.dayNumber, body)
       updateChat(chatId, { plan: updated })
       patchActivityChoice(chatId, messageIndex, { busy: false, selected: 'remove', feedback: '已从行程中去掉，地图已同步。' })
@@ -612,15 +607,6 @@ export default function App() {
                       onClick={() => chooseActivityAction(currentChat.id, index, 'remove')}>直接去掉</button>
                     <button type="button" disabled={Boolean(message.activityChoice.selected) || Boolean(message.activityChoice.busy)}
                       onClick={() => chooseActivityAction(currentChat.id, index, 'alternatives')}>看看其他地点</button>
-                    {selected && !message.activityChoice.selected && !message.activityChoice.busy && (() => {
-                      const target = message.activityChoice!.target
-                      const day = selected.itinerary.daily_plans.find((item) => item.day_number === target.dayNumber)
-                      if (!day || day.activities[target.activityIndex]?.place_id !== target.placeId || !needsBridgeMode(day, target.activityIndex)) return null
-                      return <label className="activity-bridge-mode">新连接的交通方式
-                        <input value={message.activityChoice!.bridgeMode ?? ''} placeholder="例如：步行"
-                          onChange={(event) => patchActivityChoice(currentChat.id, index, { bridgeMode: event.target.value })} />
-                      </label>
-                    })()}
                     {message.activityChoice.selected && (
                       <span role="status">{message.activityChoice.selected === 'remove' ? '已从行程中去掉，地图已同步。' : '已选择看看其他地点；行程尚未修改。'}</span>
                     )}
