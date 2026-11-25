@@ -39,6 +39,33 @@ export interface ChatResponse {
   target?: { day_number: number; activity_index: number; place_id: string }
 }
 
+export interface EditDraftResponse {
+  kind: 'edit_draft'
+  message: string
+  draft: {
+    plan_id: string
+    day_number: number
+    activity_index: number
+    original_place_id: string
+    candidate_place_id: string
+    activities: Activity[]
+    transport_segments: TransportSegment[]
+  }
+}
+
+export function createEditDraft(planId: string, target: { dayNumber: number; activityIndex: number; placeId: string }, candidateId: string): Promise<EditDraftResponse> {
+  return requestJson<EditDraftResponse>(`/api/plans/${encodeURIComponent(planId)}/edit-draft`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      day_number: target.dayNumber,
+      activity_index: target.activityIndex,
+      original_place_id: target.placeId,
+      candidate_place_id: candidateId,
+    }),
+  })
+}
+
 export function sendChat(
   text: string,
   planId: string | null,
