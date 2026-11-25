@@ -35,7 +35,7 @@ interface ChatMessage {
   text: string
   planCard?: boolean
   pending?: boolean
-  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives'; candidateId?: string; busy?: boolean; feedback?: string }
+  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives'; candidateId?: string; busy?: boolean; feedback?: string; replaced?: boolean }
 }
 
 interface Chat {
@@ -334,7 +334,7 @@ export default function App() {
       }
       const updated = await confirmEditDraft(chat.plan.plan_id, result.draft)
       updateChat(chatId, { plan: updated })
-      patchActivityChoice(chatId, messageIndex, { busy: false, candidateId: undefined, feedback: '已保存替换，地图已同步。' })
+      patchActivityChoice(chatId, messageIndex, { busy: false, candidateId: undefined, replaced: true, feedback: '已保存替换，地图已同步。' })
     } catch (error) {
       patchActivityChoice(chatId, messageIndex, { busy: false, feedback: errorText(error, '替换失败，原行程已保留。') })
     } finally {
@@ -608,7 +608,7 @@ export default function App() {
                     <button type="button" disabled={Boolean(message.activityChoice.selected) || Boolean(message.activityChoice.busy)}
                       onClick={() => chooseActivityAction(currentChat.id, index, 'alternatives')}>看看其他地点</button>
                     {message.activityChoice.selected && (
-                      <span role="status">{message.activityChoice.selected === 'remove' ? '已从行程中去掉，地图已同步。' : '已选择看看其他地点；行程尚未修改。'}</span>
+                      <span role="status">{message.activityChoice.selected === 'remove' ? '已从行程中去掉，地图已同步。' : message.activityChoice.replaced ? '已完成替换。' : '已选择看看其他地点；行程尚未修改。'}</span>
                     )}
                     {selected && message.activityChoice.selected === 'alternatives' && (
                       <div className="activity-candidates">
