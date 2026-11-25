@@ -160,19 +160,22 @@ GET 返回 `{"preferences":["美食"]}`，未设置时为空列表。PUT 请求�
   `day_number`、从 0 开始的 `activity_index` 及 `place_id`。后端用当前
   行程核对三者，目标不存在或不一致时返回 `clarify`，不修改行程。
 - `edit_draft`：含 `message` 和 `draft` 的修改建议；`draft` 指明
-  `plan_id`、从 1 开始的 `day_number`、从 0 开始的 `activity_index`、
+  `plan_id`、生成时行程的 `source_fingerprint`、从 1 开始的 `day_number`、从 0 开始的 `activity_index`、
   `original_place_id`、`candidate_place_id`，以及拟替换当天的完整
   `activities` 和 `transport_segments`。
 
-此协议只检查响应的类型、必需字段和基本取值。草案中的地点是否属于行程、
-目标活动是否仍一致、时间和交通连接是否合法，须在后续步骤用当前已保存行程
-重新校验。`edit_draft` 不是保存指令；生成草案不写数据库，也不更新地图。
-确认保存的接口和状态校验将在 7.3 单独设计。
+此协议检查响应的类型、必需字段和基本取值；确认接口还会按当前已保存行程重新核对地点、目标活动、时间、交通连接与行程指纹。`edit_draft` 不是保存指令；生成草案不写数据库，也不更新地图。
 
 当前接口只返回 `answer`、`clarify` 或已核对的 `edit_target`，不会返回 `edit_draft`；模型输出非法
 或模型调用失败返回 502。`plan_id` 未找到时返回 404。接口只读取行程，
 不写数据库或更新地图。网页仍在本地内存保存聊天历史；未生成行程的新聊天
 继续使用原需求解析流程，尚未接入此自然对话接口。
+
+## 行程替换草案与确认（v0.7.0）
+
+`POST /api/plans/{plan_id}/edit-draft` 接收 `day_number`、`activity_index`、`original_place_id` 和 `candidate_place_id`，生成内部草案并返回 `edit_draft`。Agent 只建议新活动描述；程序沿用原行程相邻交通方式，生成不写入。行程不存在返回 404；目标或候选无效返回 422；模型失败或响应不合规返回 502。
+
+`POST /api/plans/{plan_id}/edit-draft/confirm` 接收前一步返回的 `draft` 对象，仅对已保存行程确认。后端重新核对草案与当前行程并条件更新，成功返回 `plan_id`、更新后的 `itinerary` 和 `map_days`；过期或非法草案返回 422，行程不存在返回 404。Web 选定候选后点击“确认替换”，依次调用这两个接口，不单独展示草案或交通方式。
 
 ## 错误
 
