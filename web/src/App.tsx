@@ -3,6 +3,7 @@ import './App.css'
 import {
   createPlan,
   createEditDraft,
+  confirmEditDraft,
   deletePlan,
   getPreferences,
   getPlan,
@@ -110,6 +111,7 @@ export default function App() {
   const widthsAtDragStart = useRef({ left: 240, right: 420 })
   const sendingChats = useRef(new Set<string>())
   const removingPlans = useRef(new Set<string>())
+  const confirmingPlans = useRef(new Set<string>())
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -329,6 +331,28 @@ export default function App() {
       patchActivityChoice(chatId, messageIndex, { busy: false, draft: result.draft, feedback: result.message })
     } catch (error) {
       patchActivityChoice(chatId, messageIndex, { busy: false, feedback: errorText(error, '生成草案失败，原行程已保留。') })
+    }
+  }
+
+  async function confirmChosenDraft(chatId: string, messageIndex: number) {
+    const chat = chats.find((item) => item.id === chatId)
+    const choice = chat?.messages[messageIndex]?.activityChoice
+    const plan = chat?.plan
+    if (!choice?.draft || !plan || choice.busy || confirmingPlans.current.has(plan.plan_id)) return
+    if (!savedIds.has(plan.plan_id)) {
+      patchActivityChoice(chatId, messageIndex, { feedback: '请先保存行程，再确认替换。' })
+      return
+    }
+    confirmingPlans.current.add(plan.plan_id)
+    patchActivityChoice(chatId, messageIndex, { busy: true, feedback: '' })
+    try {
+      const updated = await confirmEditDraft(plan.plan_id, choice.draft)
+      updateChat(chatId, { plan: updated })
+      patchActivityChoice(chatId, messageIndex, { busy: false, draft: undefined, candidateId: undefined, feedback: '已保存替换，地图已同步。' })
+    } catch (error) {
+      patchActivityChoice(chatId, messageIndex, { busy: false, feedback: errorText(error, '确认失败，原行程已保留。') })
+    } finally {
+      confirmingPlans.current.delete(plan.plan_id)
     }
   }
 
@@ -631,6 +655,9 @@ export default function App() {
                           {message.activityChoice.draft.transport_segments.map((segment, segmentIndex) => <p key={segmentIndex}>
                             交通 {segmentIndex + 1}：{segment.mode}
                           </p>)}
+                          <button type="button" disabled={message.activityChoice.busy || !isSaved}
+                            onClick={() => void confirmChosenDraft(currentChat.id, index)}>确认替换</button>
+                          {!isSaved && <p>请先保存行程，再确认替换。</p>}
                         </div>}
                         <span role="status">{message.activityChoice.feedback}</span>
                       </div>

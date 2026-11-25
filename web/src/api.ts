@@ -67,6 +67,14 @@ export function createEditDraft(planId: string, target: { dayNumber: number; act
   })
 }
 
+export function confirmEditDraft(planId: string, draft: EditDraftResponse['draft']): Promise<CreatePlanResponse> {
+  return requestJson<CreatePlanResponse>(`/api/plans/${encodeURIComponent(planId)}/edit-draft/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(draft),
+  })
+}
+
 export function sendChat(
   text: string,
   planId: string | null,
