@@ -44,6 +44,7 @@ export interface EditDraftResponse {
   message: string
   draft: {
     plan_id: string
+    source_fingerprint: string
     day_number: number
     activity_index: number
     original_place_id: string

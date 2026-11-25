@@ -22,7 +22,7 @@ class ChatContractTests(unittest.TestCase):
             "kind": "edit_draft",
             "message": "请确认草案",
             "draft": {
-                "plan_id": "saved-plan", "day_number": 1, "activity_index": 2,
+                "plan_id": "saved-plan", "source_fingerprint": "a" * 64, "day_number": 1, "activity_index": 2,
                 "original_place_id": "P1", "candidate_place_id": "P2",
                 "activities": [{"place_id": "P2", "description": "游览", "start_time": "09:00", "end_time": "10:00"}],
                 "transport_segments": [],
@@ -40,7 +40,7 @@ class ChatContractTests(unittest.TestCase):
             chat_response_adapter.validate_python({
                 "kind": "edit_draft", "message": "草案",
                 "draft": {
-                    "plan_id": "saved-plan", "day_number": 1, "activity_index": 0,
+                    "plan_id": "saved-plan", "source_fingerprint": "a" * 64, "day_number": 1, "activity_index": 0,
                     "original_place_id": "P1", "candidate_place_id": "P1",
                     "activities": [{}], "transport_segments": [],
                 },

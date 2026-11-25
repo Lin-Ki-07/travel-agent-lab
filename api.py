@@ -9,9 +9,9 @@ from pydantic import ValidationError
 from agents.conversation_agent import ConversationAgent
 from agents.edit_draft_agent import EditDraftAgent
 from agents.travel_tools import create_web_travel_agent
-from core.chat_contract import ChatRequest
+from core.chat_contract import ChatRequest, EditDraft
 from core.chat_service import needs_travel_tools, reply_to_chat, reply_with_travel_tools
-from core.edit_draft_service import generate_edit_draft
+from core.edit_draft_service import confirm_edit_draft, generate_edit_draft
 from core.config import LLMConfig
 from core.exceptions import LLMError
 from core.trip_edit import edit_day
@@ -132,6 +132,19 @@ def create_edit_draft(plan_id: str, raw: dict) -> dict:
     except (LLMError, RuntimeError) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return response.model_dump(mode="json")
+
+
+@app.post("/api/plans/{plan_id}/edit-draft/confirm")
+def confirm_plan_edit_draft(plan_id: str, raw: dict) -> dict:
+    """确认草案并原子更新已保存行程。"""
+    itinerary = load_itinerary(plan_id)
+    if itinerary is None:
+        raise HTTPException(status_code=404, detail="已保存行程不存在")
+    try:
+        draft = EditDraft.model_validate(raw)
+        return confirm_edit_draft(itinerary, plan_id, draft)
+    except (ValidationError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/preferences")

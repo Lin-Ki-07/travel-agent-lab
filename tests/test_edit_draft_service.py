@@ -1,5 +1,7 @@
 import json
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from dataclasses import replace
 from datetime import time
 from unittest.mock import patch
@@ -8,6 +10,7 @@ from fastapi import HTTPException
 
 import api
 from core.trip_models import Activity, Place, TransportSegment
+from core.trip_store import load_itinerary, save_itinerary, update_itinerary_if_unchanged
 from tests.test_chat_service import FakeLLM, sample_itinerary
 
 
@@ -65,3 +68,28 @@ class EditDraftServiceTests(unittest.TestCase):
             with self.assertRaises(HTTPException) as caught:
                 api.create_edit_draft("missing", self.request)
         self.assertEqual(caught.exception.status_code, 404)
+
+    def test_confirm_saves_and_rejects_stale_or_tampered_drafts(self):
+        llm = FakeLLM(json.dumps({"description": "游览府城", "incoming_mode": None, "outgoing_mode": "公交"}, ensure_ascii=False))
+        with TemporaryDirectory() as directory:
+            db = Path(directory) / "trips.db"
+            save_itinerary("plan-1", self.trip, db)
+            with (
+                patch("api.load_itinerary", side_effect=lambda plan_id: load_itinerary(plan_id, db)),
+                patch("api.create_llm", return_value=llm),
+                patch("core.edit_draft_service.update_itinerary_if_unchanged", side_effect=lambda plan_id, trip, fingerprint: update_itinerary_if_unchanged(plan_id, trip, fingerprint, db)),
+            ):
+                draft = api.create_edit_draft("plan-1", self.request)["draft"]
+                self.assertEqual(load_itinerary("plan-1", db), self.trip)
+                tampered = {**draft, "activities": [{**draft["activities"][0], "start_time": "08:00"}, *draft["activities"][1:]]}
+                with self.assertRaises(HTTPException) as caught:
+                    api.confirm_plan_edit_draft("plan-1", tampered)
+                self.assertEqual(caught.exception.status_code, 422)
+                self.assertEqual(load_itinerary("plan-1", db), self.trip)
+                result = api.confirm_plan_edit_draft("plan-1", draft)
+                self.assertEqual(result["itinerary"]["daily_plans"][0]["activities"][0]["place_id"], "P3")
+                self.assertEqual(result["map_days"][0]["stops"][0]["place_id"], "P3")
+                self.assertEqual(load_itinerary("plan-1", db).daily_plans[0].activities[0].place_id, "P3")
+                with self.assertRaises(HTTPException) as stale:
+                    api.confirm_plan_edit_draft("plan-1", draft)
+                self.assertEqual(stale.exception.status_code, 422)

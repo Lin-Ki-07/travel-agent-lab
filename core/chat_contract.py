@@ -58,6 +58,7 @@ class DraftTransport(ContractModel):
 
 class EditDraft(ContractModel):
     plan_id: str = Field(min_length=1)
+    source_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
     day_number: int = Field(ge=1)
     activity_index: int = Field(ge=0)
     original_place_id: str = Field(min_length=1)
