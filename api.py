@@ -7,8 +7,9 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import ValidationError
 
 from agents.conversation_agent import ConversationAgent
+from agents.travel_tools import create_web_travel_agent
 from core.chat_contract import ChatRequest
-from core.chat_service import reply_to_chat
+from core.chat_service import needs_travel_tools, reply_to_chat, reply_with_travel_tools
 from core.config import LLMConfig
 from core.exceptions import LLMError
 from core.trip_edit import edit_day
@@ -95,7 +96,11 @@ def chat(raw_request: dict) -> dict:
             raise HTTPException(status_code=404, detail="行程不存在")
 
     try:
-        response = reply_to_chat(ConversationAgent(create_llm()), request, itinerary)
+        llm = create_llm()
+        if needs_travel_tools(request.text):
+            response = reply_with_travel_tools(create_web_travel_agent(llm), request, itinerary)
+        else:
+            response = reply_to_chat(ConversationAgent(llm), request, itinerary)
     except (LLMError, RuntimeError) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return response.model_dump(mode="json")

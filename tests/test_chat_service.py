@@ -40,6 +40,62 @@ def sample_itinerary():
 
 
 class ChatServiceTests(unittest.TestCase):
+    def test_tool_routing_keeps_edit_requests_on_conversation_path(self):
+        from core.chat_service import needs_travel_tools
+
+        for text in ("台州现在天气如何？", "查一下景区最新开放时间", "查询门票价格"):
+            with self.subTest(text=text):
+                self.assertTrue(needs_travel_tools(text))
+        for text in ("第一天去哪？", "换掉明天天气不好的景点", "查一下路线", "调整行程，查一下门票"):
+            with self.subTest(text=text):
+                self.assertFalse(needs_travel_tools(text))
+
+    def test_tool_answer_uses_fresh_agent_and_existing_contract(self):
+        class FakeToolAgent:
+            def __init__(self):
+                self.prompts = []
+
+            def run(self, prompt):
+                self.prompts.append(prompt)
+                return "模拟工具结果：台州当前天气晴。"
+
+        agents = []
+
+        def new_agent(_llm):
+            agent = FakeToolAgent()
+            agents.append(agent)
+            return agent
+
+        itinerary = sample_itinerary()
+        with (
+            patch("api.load_itinerary", return_value=itinerary),
+            patch("api.create_llm", return_value=object()),
+            patch("api.create_web_travel_agent", side_effect=new_agent),
+            patch("api.update_itinerary") as update,
+        ):
+            first = api.chat({"text": "台州现在天气如何？", "plan_id": "saved-plan", "history": [{"role": "user", "content": "准备去台州"}]})
+            second = api.chat({"text": "台州现在天气如何？", "plan_id": "saved-plan"})
+        self.assertEqual(first, {"kind": "answer", "message": "模拟工具结果：台州当前天气晴。"})
+        self.assertEqual(second["kind"], "answer")
+        self.assertIsNot(agents[0], agents[1])
+        self.assertIn("合胜广场", agents[0].prompts[0])
+        self.assertIn("准备去台州", agents[0].prompts[0])
+        self.assertNotIn("准备去台州", agents[1].prompts[0])
+        update.assert_not_called()
+
+    def test_tool_failure_returns_502(self):
+        class FailingToolAgent:
+            def run(self, _prompt):
+                raise LLMError("模拟工具模型失败")
+
+        with (
+            patch("api.create_llm", return_value=object()),
+            patch("api.create_web_travel_agent", return_value=FailingToolAgent()),
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                api.chat({"text": "台州现在天气如何？"})
+        self.assertEqual(caught.exception.status_code, 502)
+
     def test_summary_numbers_repeated_places_and_read_only_target(self):
         itinerary = sample_itinerary()
         day_one = replace(itinerary.daily_plans[0], activities=[
