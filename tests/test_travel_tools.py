@@ -1,10 +1,27 @@
 import unittest
 from unittest.mock import patch
 
-from agents.travel_tools import create_travel_tool_registry
+from agents.travel_tools import create_travel_tool_registry, create_web_travel_agent
+from core.config import AgentConfig
 
 
 class TravelToolRegistryTests(unittest.TestCase):
+    def test_web_agent_has_fresh_read_only_tools_and_history(self):
+        llm = object()
+        first = create_web_travel_agent(llm, AgentConfig(max_steps=2))
+        second = create_web_travel_agent(llm, AgentConfig(max_steps=2))
+
+        self.assertIsNot(first, second)
+        self.assertIsNot(first.tool_registry, second.tool_registry)
+        self.assertEqual(first.get_history(), [])
+        self.assertEqual(second.get_history(), [])
+        for agent in (first, second):
+            self.assertTrue(agent.tool_registry.has_tool("get_weather"))
+            self.assertTrue(agent.tool_registry.has_tool("search_travel_evidence"))
+            self.assertFalse(agent.tool_registry.has_tool("memory"))
+            self.assertFalse(agent.tool_registry.has_tool("save_itinerary"))
+            self.assertFalse(agent.tool_registry.has_tool("delete_itinerary"))
+
     def test_read_only_tool_set_is_isolated_per_registry(self):
         cli = create_travel_tool_registry()
         web = create_travel_tool_registry()
