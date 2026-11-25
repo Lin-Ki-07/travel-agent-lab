@@ -29,7 +29,7 @@ class EditDraftServiceTests(unittest.TestCase):
         self.request = {"day_number": 1, "activity_index": 0, "original_place_id": "P1", "candidate_place_id": "P3"}
 
     def test_valid_draft_is_read_only_and_preserves_other_activity(self):
-        llm = FakeLLM(json.dumps({"description": "游览府城", "incoming_mode": None, "outgoing_mode": "公交"}, ensure_ascii=False))
+        llm = FakeLLM(json.dumps({"description": "游览府城"}, ensure_ascii=False))
         with (
             patch("api.load_itinerary", return_value=self.trip),
             patch("api.create_llm", return_value=llm),
@@ -39,7 +39,7 @@ class EditDraftServiceTests(unittest.TestCase):
             response = api.create_edit_draft("plan-1", self.request)
         self.assertEqual(response["kind"], "edit_draft")
         self.assertEqual([item["place_id"] for item in response["draft"]["activities"]], ["P3", "P2"])
-        self.assertEqual(response["draft"]["transport_segments"][0]["mode"], "公交")
+        self.assertEqual(response["draft"]["transport_segments"][0]["mode"], "步行")
         self.assertEqual(self.trip.daily_plans[0].activities[0].place_id, "P1")
         update.assert_not_called()
         save.assert_not_called()
@@ -70,7 +70,7 @@ class EditDraftServiceTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 404)
 
     def test_confirm_saves_and_rejects_stale_or_tampered_drafts(self):
-        llm = FakeLLM(json.dumps({"description": "游览府城", "incoming_mode": None, "outgoing_mode": "公交"}, ensure_ascii=False))
+        llm = FakeLLM(json.dumps({"description": "游览府城"}, ensure_ascii=False))
         with TemporaryDirectory() as directory:
             db = Path(directory) / "trips.db"
             save_itinerary("plan-1", self.trip, db)

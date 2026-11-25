@@ -13,16 +13,13 @@ class DraftSuggestion(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     description: str = Field(min_length=1)
-    incoming_mode: str | None = None
-    outgoing_mode: str | None = None
 
 
 SYSTEM_PROMPT = """你是智能旅行助手，帮助用户调整已有旅行规划。
-程序已经确定待替换活动和候选地点。你只建议新活动描述及相邻交通方式。
+程序已经确定待替换活动和候选地点。你只建议新活动描述。
 保留原活动时间；不要修改地点 ID、其他活动或行程，不要声称已经保存。
 只输出 JSON 对象，不要 Markdown：
-{"description":"新活动描述","incoming_mode":"到达该地点的交通方式或 null","outgoing_mode":"离开该地点的交通方式或 null"}
-没有前一项活动时 incoming_mode 必须为 null；没有后一项活动时 outgoing_mode 必须为 null。
+{"description":"新活动描述"}
 """
 
 

@@ -45,8 +45,6 @@ def generate_edit_draft(
         f"后一地点：{places[after.place_id].name if after else '无'}"
     )
     suggestion = agent_factory().suggest(context)
-    if (before and not suggestion.incoming_mode) or (after and not suggestion.outgoing_mode):
-        raise ValueError("模型缺少相邻交通方式")
 
     activities = [
         DraftActivity(
@@ -63,15 +61,12 @@ def generate_edit_draft(
         start, end = activities[index].place_id, activities[index + 1].place_id
         if start == end:
             continue
-        if index == activity_index - 1:
-            mode, minutes = suggestion.incoming_mode, None
-        elif index == activity_index:
-            mode, minutes = suggestion.outgoing_mode, None
-        else:
-            prior = routes.get((start, end))
-            if prior is None:
-                raise ValueError("原行程交通连接不完整")
-            mode, minutes = prior.mode, prior.estimated_minutes
+        old_start = day.activities[index].place_id
+        old_end = day.activities[index + 1].place_id
+        prior = routes.get((old_start, old_end))
+        if prior is None:
+            raise ValueError("原行程交通连接不完整")
+        mode, minutes = prior.mode, None if index in (activity_index - 1, activity_index) else prior.estimated_minutes
         transports.append(DraftTransport(
             from_place_id=start, to_place_id=end, mode=mode, estimated_minutes=minutes,
         ))
