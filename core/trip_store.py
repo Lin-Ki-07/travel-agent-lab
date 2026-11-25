@@ -1,4 +1,5 @@
 import json
+import hashlib
 import sqlite3
 from dataclasses import asdict, replace
 from datetime import date, datetime
@@ -164,6 +165,35 @@ def update_itinerary(
                 "SET itinerary_json = ?, updated_at = ? "
                 "WHERE plan_id = ? AND schema_version = ?",
                 (payload, now, plan_id, SCHEMA_VERSION),
+            )
+            return cursor.rowcount == 1
+
+
+def itinerary_fingerprint(itinerary: Itinerary) -> str:
+    payload = json.dumps(jsonable_encoder(asdict(itinerary)), ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def update_itinerary_if_unchanged(
+    plan_id: str, itinerary: Itinerary, expected_fingerprint: str, db_path: Path = DB_PATH,
+) -> bool:
+    """在同一事务内核对旧记录并写入，避免确认期间覆盖其他编辑。"""
+    payload = json.dumps(jsonable_encoder(asdict(itinerary)), ensure_ascii=False)
+    now = datetime.now().astimezone().isoformat()
+    with closing(_connect(db_path)) as connection:
+        with connection:
+            row = connection.execute(
+                "SELECT itinerary_json FROM saved_plans WHERE plan_id = ? AND schema_version = ?",
+                (plan_id, SCHEMA_VERSION),
+            ).fetchone()
+            if row is None:
+                return False
+            current = json.dumps(json.loads(row[0]), ensure_ascii=False, sort_keys=True)
+            if hashlib.sha256(current.encode("utf-8")).hexdigest() != expected_fingerprint:
+                return False
+            cursor = connection.execute(
+                "UPDATE saved_plans SET itinerary_json = ?, updated_at = ? WHERE plan_id = ? AND itinerary_json = ?",
+                (payload, now, plan_id, row[0]),
             )
             return cursor.rowcount == 1
 

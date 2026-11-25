@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
   createPlan,
+  createEditDraft,
+  confirmEditDraft,
   deletePlan,
   getPreferences,
   getPlan,
@@ -9,6 +11,7 @@ import {
   parseRequest,
   PlanApiError,
   savePlan,
+  sendChat,
   updatePlanDay,
   type CreatePlanResponse,
   type EditDayRequest,
@@ -21,7 +24,7 @@ import MapPanel from './MapPanel'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
 import { findReplacementTargets, type ActivityTarget } from './editIntent'
-import { needsBridgeMode, prepareActivityRemoval } from './removeActivity'
+import { prepareActivityRemoval } from './removeActivity'
 import { replacementCandidates } from './replacementCandidates'
 import { formatParseReply, mergeParsedFields, missingTripFields, summarizeTripFields, toRequestBody, validateTripForm, type TripFormValues } from './tripRequest'
 
@@ -32,7 +35,7 @@ interface ChatMessage {
   text: string
   planCard?: boolean
   pending?: boolean
-  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives'; candidateId?: string; bridgeMode?: string; busy?: boolean; feedback?: string }
+  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives'; candidateId?: string; busy?: boolean; feedback?: string; replaced?: boolean }
 }
 
 interface Chat {
@@ -107,6 +110,7 @@ export default function App() {
   const widthsAtDragStart = useRef({ left: 240, right: 420 })
   const sendingChats = useRef(new Set<string>())
   const removingPlans = useRef(new Set<string>())
+  const confirmingPlans = useRef(new Set<string>())
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -308,6 +312,36 @@ export default function App() {
       : chat))
   }
 
+  async function confirmChosenReplacement(chatId: string, messageIndex: number) {
+    const chat = chats.find((item) => item.id === chatId)
+    const choice = chat?.messages[messageIndex]?.activityChoice
+    if (!chat?.plan || !choice?.candidateId || choice.busy || confirmingPlans.current.has(chat.plan.plan_id)) return
+    if (!savedIds.has(chat.plan.plan_id)) {
+      patchActivityChoice(chatId, messageIndex, { feedback: '请先保存行程，再确认替换。' })
+      return
+    }
+    const day = chat.plan.itinerary.daily_plans.find((item) => item.day_number === choice.target.dayNumber)
+    if (day?.activities[choice.target.activityIndex]?.place_id !== choice.target.placeId) {
+      patchActivityChoice(chatId, messageIndex, { feedback: '行程已变化，请重新选择要替换的活动。' })
+      return
+    }
+    confirmingPlans.current.add(chat.plan.plan_id)
+    patchActivityChoice(chatId, messageIndex, { busy: true, feedback: '' })
+    try {
+      const result = await createEditDraft(chat.plan.plan_id, choice.target, choice.candidateId)
+      if (result.draft.candidate_place_id !== choice.candidateId || result.draft.original_place_id !== choice.target.placeId) {
+        throw new Error('替换内容与当前选择不一致，请重试。')
+      }
+      const updated = await confirmEditDraft(chat.plan.plan_id, result.draft)
+      updateChat(chatId, { plan: updated })
+      patchActivityChoice(chatId, messageIndex, { busy: false, candidateId: undefined, replaced: true, feedback: '已保存替换，地图已同步。' })
+    } catch (error) {
+      patchActivityChoice(chatId, messageIndex, { busy: false, feedback: errorText(error, '替换失败，原行程已保留。') })
+    } finally {
+      confirmingPlans.current.delete(chat.plan.plan_id)
+    }
+  }
+
   async function removeChosenActivity(chatId: string, messageIndex: number) {
     const chat = chats.find((item) => item.id === chatId)
     const choice = chat?.messages[messageIndex]?.activityChoice
@@ -327,15 +361,10 @@ export default function App() {
       patchActivityChoice(chatId, messageIndex, { feedback: '当天至少需要保留一项活动，不能直接去掉。' })
       return
     }
-    if (needsBridgeMode(day, target.activityIndex) && !choice.bridgeMode?.trim()) {
-      patchActivityChoice(chatId, messageIndex, { feedback: '请填写删掉该活动后新连接的交通方式。' })
-      return
-    }
-
     removingPlans.current.add(plan.plan_id)
     patchActivityChoice(chatId, messageIndex, { busy: true, feedback: '' })
     try {
-      const body = prepareActivityRemoval(day, target.activityIndex, choice.bridgeMode ?? '')
+      const body = prepareActivityRemoval(day, target.activityIndex)
       const updated = await updatePlanDay(plan.plan_id, target.dayNumber, body)
       updateChat(chatId, { plan: updated })
       patchActivityChoice(chatId, messageIndex, { busy: false, selected: 'remove', feedback: '已从行程中去掉，地图已同步。' })
@@ -351,23 +380,56 @@ export default function App() {
     if (sendingChats.current.has(chatId)) return
     updateChat(chatId, { draft: '' })
 
-    // 已生成行程：先定位明确提出要替换的活动，暂不修改行程。
+    // 已生成行程：编辑请求走现有定位，其他消息进入自然对话。
     if (selected) {
       const targets = findReplacementTargets(text, selected.itinerary)
-      let reply = '这是已生成的行程。要规划新的行程，请点击左侧“＋ 新聊天”。'
-      let activityChoice: ChatMessage['activityChoice']
-      if (targets) {
+      if (targets && targets.length > 0) {
+        let reply = ''
+        let activityChoice: ChatMessage['activityChoice']
         if (targets.length === 1) {
           const target = targets[0]
           reply = `第 ${target.dayNumber} 天的“${target.placeName}”（第 ${target.activityIndex + 1} 项）不想去了。你想直接去掉，还是看看其他地点？`
           activityChoice = { target }
         } else if (targets.length > 1) {
           reply = `找到多个可能的活动：${targets.map((target) => `第 ${target.dayNumber} 天第 ${target.activityIndex + 1} 项“${target.placeName}”`).join('、')}。请指出要替换哪一项；现在行程尚未修改。`
-        } else {
-          reply = '我还无法确定你说的是行程中的哪个地点。请说出该地点的名称，或指出它在第几天的第几项；现在行程尚未修改。'
         }
+        appendMessages(chatId, [{ role: 'user', text }, { role: 'assistant', text: reply, activityChoice }])
+        return
       }
-      appendMessages(chatId, [{ role: 'user', text }, { role: 'assistant', text: reply, activityChoice }])
+
+      const history = currentChat.messages
+        .filter((message) => !message.pending && !message.planCard && message.text)
+        .slice(-12)
+        .map((message) => ({ role: message.role, content: message.text }))
+      appendMessages(chatId, [{ role: 'user', text }])
+      sendingChats.current.add(chatId)
+      updateChat(chatId, { parsing: true })
+      try {
+        const result = await sendChat(text, selected.plan_id, history)
+        if (result.kind === 'edit_target' && result.target) {
+          const day = selected.itinerary.daily_plans.find((item) => item.day_number === result.target!.day_number)
+          const activity = day?.activities[result.target.activity_index]
+          const place = selected.itinerary.places.find((item) => item.place_id === result.target!.place_id)
+          if (activity?.place_id === result.target.place_id && place) {
+            const target: ActivityTarget = {
+              dayNumber: result.target.day_number,
+              activityIndex: result.target.activity_index,
+              placeId: result.target.place_id,
+              placeName: place.name,
+            }
+            appendMessages(chatId, [{ role: 'assistant', text: `第 ${target.dayNumber} 天的“${target.placeName}”（第 ${target.activityIndex + 1} 项）不想去了。你想直接去掉，还是看看其他地点？`, activityChoice: { target } }])
+          } else {
+            appendMessages(chatId, [{ role: 'assistant', text: '行程已变化，请重新说明要调整的地点。' }])
+          }
+        } else {
+          appendMessages(chatId, [{ role: 'assistant', text: result.message }])
+        }
+      } catch (error) {
+        appendMessages(chatId, [{ role: 'assistant', text: `处理失败：${errorText(error, '请稍后重试。')}` }])
+      } finally {
+        sendingChats.current.delete(chatId)
+        updateChat(chatId, { parsing: false })
+      }
       return
     }
 
@@ -469,7 +531,7 @@ export default function App() {
   function selectPreviewCandidate(placeId: string) {
     const messageIndex = currentChat.messages.findLastIndex((message) => message.activityChoice === activeChoice)
     if (messageIndex < 0 || !previewCandidates.some((place) => place.place_id === placeId)) return
-    patchActivityChoice(currentChat.id, messageIndex, { candidateId: placeId })
+    patchActivityChoice(currentChat.id, messageIndex, { candidateId: placeId, feedback: '' })
   }
 
   return (
@@ -545,30 +607,23 @@ export default function App() {
                       onClick={() => chooseActivityAction(currentChat.id, index, 'remove')}>直接去掉</button>
                     <button type="button" disabled={Boolean(message.activityChoice.selected) || Boolean(message.activityChoice.busy)}
                       onClick={() => chooseActivityAction(currentChat.id, index, 'alternatives')}>看看其他地点</button>
-                    {selected && !message.activityChoice.selected && !message.activityChoice.busy && (() => {
-                      const target = message.activityChoice!.target
-                      const day = selected.itinerary.daily_plans.find((item) => item.day_number === target.dayNumber)
-                      if (!day || day.activities[target.activityIndex]?.place_id !== target.placeId || !needsBridgeMode(day, target.activityIndex)) return null
-                      return <label className="activity-bridge-mode">新连接的交通方式
-                        <input value={message.activityChoice!.bridgeMode ?? ''} placeholder="例如：步行"
-                          onChange={(event) => patchActivityChoice(currentChat.id, index, { bridgeMode: event.target.value })} />
-                      </label>
-                    })()}
                     {message.activityChoice.selected && (
-                      <span role="status">{message.activityChoice.selected === 'remove' ? '已从行程中去掉，地图已同步。' : '已选择看看其他地点；行程尚未修改。'}</span>
+                      <span role="status">{message.activityChoice.selected === 'remove' ? '已从行程中去掉，地图已同步。' : message.activityChoice.replaced ? '已完成替换。' : '已选择看看其他地点；行程尚未修改。'}</span>
                     )}
                     {selected && message.activityChoice.selected === 'alternatives' && (
                       <div className="activity-candidates">
                         {replacementCandidates(selected.itinerary, message.activityChoice.target).map((place) => (
                           <button key={place.place_id} type="button" disabled={message.activityChoice?.busy}
                             aria-pressed={message.activityChoice?.candidateId === place.place_id}
-                            onClick={() => patchActivityChoice(currentChat.id, index, { candidateId: place.place_id })}>{place.name}</button>
+                            onClick={() => patchActivityChoice(currentChat.id, index, { candidateId: place.place_id, feedback: '' })}>{place.name}</button>
                         ))}
-                        {message.activityChoice.candidateId && <span role="status">已选择候选地点；自动修改草案将在后续 Agent 步骤接入，当前不会保存替换。</span>}
+                        {message.activityChoice.candidateId && <button type="button" disabled={message.activityChoice.busy || !isSaved}
+                          onClick={() => void confirmChosenReplacement(currentChat.id, index)}>确认替换</button>}
+                        {message.activityChoice.candidateId && !isSaved && <span role="status">请先保存行程，再确认替换。</span>}
                         <span role="status">{message.activityChoice.feedback}</span>
                       </div>
                     )}
-                    {message.activityChoice.busy && <span role="status">正在更新行程…</span>}
+                    {message.activityChoice.busy && <span role="status">正在处理…</span>}
                     {message.activityChoice.feedback && !message.activityChoice.selected && <span role="status">{message.activityChoice.feedback}</span>}
                   </div>
                 )}

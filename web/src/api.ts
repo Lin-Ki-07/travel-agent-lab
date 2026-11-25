@@ -33,6 +33,66 @@ export interface ParseRequestResponse {
   summary: string
 }
 
+export interface ChatResponse {
+  kind: 'answer' | 'clarify' | 'edit_target'
+  message: string
+  target?: { day_number: number; activity_index: number; place_id: string }
+}
+
+export interface EditDraftResponse {
+  kind: 'edit_draft'
+  message: string
+  draft: {
+    plan_id: string
+    source_fingerprint: string
+    day_number: number
+    activity_index: number
+    original_place_id: string
+    candidate_place_id: string
+    activities: Activity[]
+    transport_segments: TransportSegment[]
+  }
+}
+
+export function createEditDraft(planId: string, target: { dayNumber: number; activityIndex: number; placeId: string }, candidateId: string): Promise<EditDraftResponse> {
+  return requestJson<EditDraftResponse>(`/api/plans/${encodeURIComponent(planId)}/edit-draft`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      day_number: target.dayNumber,
+      activity_index: target.activityIndex,
+      original_place_id: target.placeId,
+      candidate_place_id: candidateId,
+    }),
+  }).catch((error: unknown) => {
+    if (error instanceof PlanApiError && error.status === 404 && error.message === 'Not Found') {
+      throw new PlanApiError('当前后端未加载替换接口，请重启 uvicorn 后重试。', 404)
+    }
+    throw error
+  })
+}
+
+export function confirmEditDraft(planId: string, draft: EditDraftResponse['draft']): Promise<CreatePlanResponse> {
+  return requestJson<CreatePlanResponse>(`/api/plans/${encodeURIComponent(planId)}/edit-draft/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(draft),
+  })
+}
+
+export function sendChat(
+  text: string,
+  planId: string | null,
+  history: { role: 'user' | 'assistant'; content: string }[],
+  baseUrl = '',
+): Promise<ChatResponse> {
+  return requestJson<ChatResponse>(`${baseUrl}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, plan_id: planId, history }),
+  })
+}
+
 export class PlanApiError extends Error {
   readonly status: number | null
 
