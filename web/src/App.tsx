@@ -15,7 +15,6 @@ import {
   updatePlanDay,
   type CreatePlanResponse,
   type EditDayRequest,
-  type EditDraftResponse,
   type SavedPlanSummary,
 } from './api'
 import ChatComposer from './ChatComposer'
@@ -36,7 +35,7 @@ interface ChatMessage {
   text: string
   planCard?: boolean
   pending?: boolean
-  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives'; candidateId?: string; bridgeMode?: string; busy?: boolean; feedback?: string; draft?: EditDraftResponse['draft'] }
+  activityChoice?: { target: ActivityTarget; selected?: 'remove' | 'alternatives'; candidateId?: string; bridgeMode?: string; busy?: boolean; feedback?: string }
 }
 
 interface Chat {
@@ -313,46 +312,33 @@ export default function App() {
       : chat))
   }
 
-  async function generateChosenDraft(chatId: string, messageIndex: number) {
+  async function confirmChosenReplacement(chatId: string, messageIndex: number) {
     const chat = chats.find((item) => item.id === chatId)
     const choice = chat?.messages[messageIndex]?.activityChoice
-    if (!chat?.plan || !choice?.candidateId || choice.busy) return
-    const day = chat.plan.itinerary.daily_plans.find((item) => item.day_number === choice.target.dayNumber)
-    if (day?.activities[choice.target.activityIndex]?.place_id !== choice.target.placeId) {
-      patchActivityChoice(chatId, messageIndex, { feedback: '行程已变化，请重新选择要替换的活动。', draft: undefined })
-      return
-    }
-    patchActivityChoice(chatId, messageIndex, { busy: true, feedback: '', draft: undefined })
-    try {
-      const result = await createEditDraft(chat.plan.plan_id, choice.target, choice.candidateId)
-      if (result.draft.candidate_place_id !== choice.candidateId || result.draft.original_place_id !== choice.target.placeId) {
-        throw new Error('草案与当前选择不一致，请重新生成。')
-      }
-      patchActivityChoice(chatId, messageIndex, { busy: false, draft: result.draft, feedback: result.message })
-    } catch (error) {
-      patchActivityChoice(chatId, messageIndex, { busy: false, feedback: errorText(error, '生成草案失败，原行程已保留。') })
-    }
-  }
-
-  async function confirmChosenDraft(chatId: string, messageIndex: number) {
-    const chat = chats.find((item) => item.id === chatId)
-    const choice = chat?.messages[messageIndex]?.activityChoice
-    const plan = chat?.plan
-    if (!choice?.draft || !plan || choice.busy || confirmingPlans.current.has(plan.plan_id)) return
-    if (!savedIds.has(plan.plan_id)) {
+    if (!chat?.plan || !choice?.candidateId || choice.busy || confirmingPlans.current.has(chat.plan.plan_id)) return
+    if (!savedIds.has(chat.plan.plan_id)) {
       patchActivityChoice(chatId, messageIndex, { feedback: '请先保存行程，再确认替换。' })
       return
     }
-    confirmingPlans.current.add(plan.plan_id)
+    const day = chat.plan.itinerary.daily_plans.find((item) => item.day_number === choice.target.dayNumber)
+    if (day?.activities[choice.target.activityIndex]?.place_id !== choice.target.placeId) {
+      patchActivityChoice(chatId, messageIndex, { feedback: '行程已变化，请重新选择要替换的活动。' })
+      return
+    }
+    confirmingPlans.current.add(chat.plan.plan_id)
     patchActivityChoice(chatId, messageIndex, { busy: true, feedback: '' })
     try {
-      const updated = await confirmEditDraft(plan.plan_id, choice.draft)
+      const result = await createEditDraft(chat.plan.plan_id, choice.target, choice.candidateId)
+      if (result.draft.candidate_place_id !== choice.candidateId || result.draft.original_place_id !== choice.target.placeId) {
+        throw new Error('替换内容与当前选择不一致，请重试。')
+      }
+      const updated = await confirmEditDraft(chat.plan.plan_id, result.draft)
       updateChat(chatId, { plan: updated })
-      patchActivityChoice(chatId, messageIndex, { busy: false, draft: undefined, candidateId: undefined, feedback: '已保存替换，地图已同步。' })
+      patchActivityChoice(chatId, messageIndex, { busy: false, candidateId: undefined, feedback: '已保存替换，地图已同步。' })
     } catch (error) {
-      patchActivityChoice(chatId, messageIndex, { busy: false, feedback: errorText(error, '确认失败，原行程已保留。') })
+      patchActivityChoice(chatId, messageIndex, { busy: false, feedback: errorText(error, '替换失败，原行程已保留。') })
     } finally {
-      confirmingPlans.current.delete(plan.plan_id)
+      confirmingPlans.current.delete(chat.plan.plan_id)
     }
   }
 
@@ -550,7 +536,7 @@ export default function App() {
   function selectPreviewCandidate(placeId: string) {
     const messageIndex = currentChat.messages.findLastIndex((message) => message.activityChoice === activeChoice)
     if (messageIndex < 0 || !previewCandidates.some((place) => place.place_id === placeId)) return
-    patchActivityChoice(currentChat.id, messageIndex, { candidateId: placeId, draft: undefined, feedback: '' })
+    patchActivityChoice(currentChat.id, messageIndex, { candidateId: placeId, feedback: '' })
   }
 
   return (
@@ -643,22 +629,11 @@ export default function App() {
                         {replacementCandidates(selected.itinerary, message.activityChoice.target).map((place) => (
                           <button key={place.place_id} type="button" disabled={message.activityChoice?.busy}
                             aria-pressed={message.activityChoice?.candidateId === place.place_id}
-                            onClick={() => patchActivityChoice(currentChat.id, index, { candidateId: place.place_id, draft: undefined, feedback: '' })}>{place.name}</button>
+                            onClick={() => patchActivityChoice(currentChat.id, index, { candidateId: place.place_id, feedback: '' })}>{place.name}</button>
                         ))}
-                        {message.activityChoice.candidateId && <button type="button" disabled={message.activityChoice.busy}
-                          onClick={() => void generateChosenDraft(currentChat.id, index)}>生成替换草案</button>}
-                        {message.activityChoice.draft && <div role="status">
-                          <p>替换草案（尚未保存）：</p>
-                          {message.activityChoice.draft.activities.map((activity, activityIndex) => <p key={activityIndex}>
-                            第 {activityIndex + 1} 项：{activity.description}（{activity.start_time}–{activity.end_time}）
-                          </p>)}
-                          {message.activityChoice.draft.transport_segments.map((segment, segmentIndex) => <p key={segmentIndex}>
-                            交通 {segmentIndex + 1}：{segment.mode}
-                          </p>)}
-                          <button type="button" disabled={message.activityChoice.busy || !isSaved}
-                            onClick={() => void confirmChosenDraft(currentChat.id, index)}>确认替换</button>
-                          {!isSaved && <p>请先保存行程，再确认替换。</p>}
-                        </div>}
+                        {message.activityChoice.candidateId && <button type="button" disabled={message.activityChoice.busy || !isSaved}
+                          onClick={() => void confirmChosenReplacement(currentChat.id, index)}>确认替换</button>}
+                        {message.activityChoice.candidateId && !isSaved && <span role="status">请先保存行程，再确认替换。</span>}
                         <span role="status">{message.activityChoice.feedback}</span>
                       </div>
                     )}

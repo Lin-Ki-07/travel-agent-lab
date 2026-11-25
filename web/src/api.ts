@@ -64,6 +64,11 @@ export function createEditDraft(planId: string, target: { dayNumber: number; act
       original_place_id: target.placeId,
       candidate_place_id: candidateId,
     }),
+  }).catch((error: unknown) => {
+    if (error instanceof PlanApiError && error.status === 404 && error.message === 'Not Found') {
+      throw new PlanApiError('当前后端未加载替换接口，请重启 uvicorn 后重试。', 404)
+    }
+    throw error
   })
 }
 
