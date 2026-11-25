@@ -7,9 +7,11 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import ValidationError
 
 from agents.conversation_agent import ConversationAgent
+from agents.edit_draft_agent import EditDraftAgent
 from agents.travel_tools import create_web_travel_agent
 from core.chat_contract import ChatRequest
 from core.chat_service import needs_travel_tools, reply_to_chat, reply_with_travel_tools
+from core.edit_draft_service import generate_edit_draft
 from core.config import LLMConfig
 from core.exceptions import LLMError
 from core.trip_edit import edit_day
@@ -101,6 +103,32 @@ def chat(raw_request: dict) -> dict:
             response = reply_with_travel_tools(create_web_travel_agent(llm), request, itinerary)
         else:
             response = reply_to_chat(ConversationAgent(llm), request, itinerary)
+    except (LLMError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return response.model_dump(mode="json")
+
+
+@app.post("/api/plans/{plan_id}/edit-draft")
+def create_edit_draft(plan_id: str, raw: dict) -> dict:
+    """生成替换预览；不保存行程。"""
+    itinerary = load_itinerary(plan_id) or generated_plans.get(plan_id)
+    if itinerary is None:
+        raise HTTPException(status_code=404, detail="行程不存在")
+    try:
+        day_number = raw["day_number"]
+        activity_index = raw["activity_index"]
+        original_place_id = raw["original_place_id"]
+        candidate_place_id = raw["candidate_place_id"]
+        if type(day_number) is not int or type(activity_index) is not int:
+            raise ValueError("目标序号必须是整数")
+        if not all(isinstance(item, str) and item.strip() for item in (original_place_id, candidate_place_id)):
+            raise ValueError("地点 ID 不能为空")
+        response = generate_edit_draft(
+            lambda: EditDraftAgent(create_llm()), itinerary, plan_id, day_number,
+            activity_index, original_place_id, candidate_place_id,
+        )
+    except (KeyError, ValueError, ValidationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except (LLMError, RuntimeError) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return response.model_dump(mode="json")
