@@ -11,6 +11,7 @@ from core.trip_models import (
     TripRequest,
     TransportSegment,
     WeatherSnapshot,
+    parse_route_snapshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,8 @@ def parse_itinerary(
     request: TripRequest,
     places: list[Place],
     weather: list[WeatherSnapshot],
+    *,
+    restore_routes: bool = False,
 ) -> Itinerary:
     """解析并校验模型返回的结构化 JSON。"""
     try:
@@ -129,6 +132,7 @@ def parse_itinerary(
                     to_place_id=transport_data["to_place_id"],
                     mode=transport_data["mode"],
                     estimated_minutes=transport_data.get("estimated_minutes"),
+                    route=parse_route_snapshot(transport_data.get("route")) if restore_routes else None,
                 )
             except (KeyError, TypeError, ValueError) as exc:
                 raise ValueError(f"第 {index} 天存在非法交通段") from exc

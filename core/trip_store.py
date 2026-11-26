@@ -118,6 +118,7 @@ def load_itinerary(
         request,
         places,
         weather,
+        restore_routes=True,
     )
     return replace(
         validated,

@@ -184,6 +184,21 @@ GET 返回 `{"preferences":["美食"]}`，未设置时为空列表。PUT 请求�
 
 ## 保存边界
 
+### v0.8.0 路线快照结构（8.2.1，仅数据层）
+
+交通段新增可选 `route`，旧行程缺失此字段时按 `null` 读取，表示未查询。
+非空快照含 `status`（`ok` 或 `failed`）、`source`、带时区的 `queried_at`、
+`distance_meters`、`duration_seconds`、`parts`、`failure_reason`。
+成功快照的距离和秒数必须为正整数，失败原因为 null；`parts` 至少一项，
+每项含非空 `mode` 及至少两个 `[经度, 纬度]` 有限坐标的 `positions`。
+失败快照必须有非空原因，距离和秒数为 null，parts 为空。
+有成功快照时 `estimated_minutes` 必须等于秒数向上取整到分钟；失败时为 null。
+
+当前仅实现数据结构与持久化读回，尚未接通查询或地图绘制。
+模型生成结果和单日编辑请求中的 route 不作为可信事实接受；编辑当天会清除当天路线快照。
+旧行程原有 estimated_minutes 仍保留，但不能视为高德查询结果。
+新增字段存于原 JSON，schema_version 仍为 1；旧版本程序不保证保留新字段。
+
 已保存行程跨后端重启有效，未保存生成结果仅在当前进程暂存。
 数据库位于被 Git 忽略的 `data/trips.db`，与 CLI 记忆数据库分开；记录含 `schema_version=1`。
 本版支持按 ID 删除行程；没有账号或多用户隔离。
