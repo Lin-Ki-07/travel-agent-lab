@@ -1,4 +1,4 @@
-"""高德路径规划 2.0 适配层；尚未接入规划入口。"""
+"""高德路径规划 2.0 适配层，不调用模型。"""
 
 import os
 from datetime import date, datetime, time, timezone
