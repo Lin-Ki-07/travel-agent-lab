@@ -17,7 +17,12 @@ export default function DraggableDetails({ children, onDetach, onDock }: { child
   const [moving, setMoving] = useState(false)
 
   useEffect(() => {
-    const resize = () => setPosition((current) => current ? constrain(current) : null)
+    const resize = () => {
+      drag.current = null
+      setMoving(false)
+      setPreview(null)
+      setPosition((current) => current ? constrain(current) : null)
+    }
     window.addEventListener('resize', resize)
     return () => window.removeEventListener('resize', resize)
   }, [])

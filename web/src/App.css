@@ -1165,3 +1165,21 @@ body {
   border: 2px solid #2a71d3; border-radius: 28px; background: #2a71d326;
   box-shadow: 0 0 0 4px #2a71d31a;
 }
+/* Keep both panel handles reachable on compact windows. */
+.workspace-panels { grid-template-rows: minmax(0, 1fr); }
+.workspace-panels > .floating-workspace:first-child { min-width: 0; }
+.workspace-panels:has(> .is-collapsed) > .details-workspace {
+  border-radius: 28px; border-left: 1px solid #ffffffa0;
+}
+.workspace-panels:has(> .is-collapsed) > .resize-handle { visibility: hidden; }
+@media (max-width: 900px) {
+  .workspace-panels { grid-template-columns: minmax(0, 1fr) 6px minmax(200px, 32%) !important; }
+}
+@media (max-width: 600px) {
+  .workspace-panels { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .workspace-panels > .floating-workspace:first-child { grid-column: 1; grid-row: 1; border-radius: 22px; border: 1px solid #ffffffa0; }
+  .workspace-panels > .resize-handle { display: none; }
+  .details-dock-anchor, .workspace-panels > .details-workspace { grid-column: 1; grid-row: 2; }
+  .workspace-panels > .details-workspace { border-radius: 22px; border: 1px solid #ffffffa0; }
+  :root[data-theme='dark'] .workspace-panels > .floating-workspace { border-color: #ffffff24; }
+}
