@@ -7,6 +7,9 @@ import type { ActivityTarget } from './editIntent'
 interface MapPanelProps {
   // 没有行程时传入空数组：地图仍显示（全国视野），但不绘制标记和示意线。
   days: MapDay[]
+  background?: boolean
+  selectedDayIndex?: number
+  onDayIndexChange?: (index: number) => void
   preview?: { target: ActivityTarget; candidates: Place[]; selectedId?: string }
   onSelectCandidate?: (placeId: string) => void
 }
@@ -19,7 +22,7 @@ type MapStatus =
 
 const DEFAULT_CENTER: [number, number] = [104.1, 35.9]
 
-export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelProps) {
+export default function MapPanel({ days, preview, onSelectCandidate, background = false, selectedDayIndex, onDayIndexChange }: MapPanelProps) {
   const [dayIndex, setDayIndex] = useState(0)
   // 没有 Key 时直接进入 no-key 状态，不加载脚本，effect 内无需同步 setState。
   const [status, setStatus] = useState<MapStatus>(() =>
@@ -30,7 +33,7 @@ export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelP
   const amapRef = useRef<AMapNamespace | null>(null)
   const resizeObserverRef = useRef<ResizeObserver | null>(null)
 
-  const safeIndex = clampDayIndex(dayIndex, days.length)
+  const safeIndex = clampDayIndex(selectedDayIndex ?? dayIndex, days.length)
   const currentDay = days[safeIndex] as MapDay | undefined
   const lineLabel = currentDay ? buildOverlaySpec(currentDay).label : ''
 
@@ -150,8 +153,8 @@ export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelP
           : null
 
   return (
-    <div className="map-panel">
-      {days.length > 0 && (
+    <div className={background ? "map-panel map-panel-background" : "map-panel"}>
+      {!background && days.length > 0 && (
         <>
           <div className="day-tabs" role="tablist" aria-label="按日查看地图">
             {days.map((day, index) => (
@@ -161,7 +164,7 @@ export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelP
                 role="tab"
                 aria-selected={index === safeIndex}
                 className={index === safeIndex ? 'day-tab active' : 'day-tab'}
-                onClick={() => setDayIndex(index)}
+                onClick={() => { setDayIndex(index); onDayIndexChange?.(index) }}
               >
                 第 {day.day_number} 天
               </button>
@@ -178,7 +181,7 @@ export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelP
         {overlayMessage && <p className="map-overlay muted">{overlayMessage}</p>}
       </div>
 
-      {days.length === 0 ? (
+      {!background && (days.length === 0 ? (
         <p className="muted">选择或生成一个行程后，这里按日期显示地点与示意线。</p>
       ) : (
         currentDay && (
@@ -193,7 +196,7 @@ export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelP
             </ol>
           </>
         )
-      )}
+      ))}
     </div>
   )
 }

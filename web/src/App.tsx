@@ -23,6 +23,7 @@ import PlanResultView from './PlanResultView'
 import MapPanel from './MapPanel'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
+import FloatingWorkspace from './FloatingWorkspace'
 import { findReplacementTargets, type ActivityTarget } from './editIntent'
 import { prepareActivityRemoval } from './removeActivity'
 import { replacementCandidates } from './replacementCandidates'
@@ -105,6 +106,7 @@ export default function App() {
   const [saving, setSaving] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
+  const [mapDayIndex, setMapDayIndex] = useState(0)
   const [leftWidth, setLeftWidth] = useState(240)
   const [rightWidth, setRightWidth] = useState(420)
   const widthsAtDragStart = useRef({ left: 240, right: 420 })
@@ -535,7 +537,14 @@ export default function App() {
   }
 
   return (
-    <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
+    <div className="map-workspace">
+      <div className="workspace-map" aria-label="背景地图">
+        <MapPanel days={selected?.map_days ?? []} background selectedDayIndex={mapDayIndex}
+          preview={previewTarget ? { target: previewTarget, candidates: previewCandidates, selectedId: activeChoice?.candidateId } : undefined}
+          onSelectCandidate={selectPreviewCandidate} />
+      </div>
+      <FloatingWorkspace>
+      <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
       <aside className="pane pane-history" aria-label="对话列表">
         <HistoryPanel
           chats={chats}
@@ -660,9 +669,12 @@ export default function App() {
       <section className="pane pane-map" aria-label="地图">
         <h2>地图</h2>
         <MapPanel key={selected?.plan_id ?? 'empty'} days={selected?.map_days ?? []}
+          selectedDayIndex={mapDayIndex} onDayIndexChange={setMapDayIndex}
           preview={previewTarget ? { target: previewTarget, candidates: previewCandidates, selectedId: activeChoice?.candidateId } : undefined}
           onSelectCandidate={selectPreviewCandidate} />
       </section>
+      </div>
+      </FloatingWorkspace>
     </div>
   )
 }
