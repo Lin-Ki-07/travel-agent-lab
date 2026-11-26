@@ -681,7 +681,7 @@ export default function App() {
 
       <ResizeHandle label="调整行程详情栏宽度" onDragStart={beginDrag} onDrag={dragRight} />
 
-      <DraggableDetails onDetach={() => setDetailsDetached(true)}>
+      <DraggableDetails onDetach={() => setDetailsDetached(true)} onDock={() => setDetailsDetached(false)}>
       <section id="plan-details" className="pane pane-details" aria-label="行程详情">
         <h2>行程详情</h2>
         {selected ? (
