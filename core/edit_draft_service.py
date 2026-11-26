@@ -4,6 +4,7 @@ from agents.edit_draft_agent import EditDraftAgent
 from collections.abc import Callable
 from core.chat_contract import DraftActivity, DraftTransport, EditDraft, EditDraftResponse
 from core.trip_edit import edit_day
+from core.trip_routes import refresh_edited_day_routes
 from core.trip_models import Itinerary
 from core.trip_store import itinerary_fingerprint, update_itinerary_if_unchanged
 from dataclasses import asdict
@@ -113,6 +114,7 @@ def confirm_edit_draft(itinerary: Itinerary, plan_id: str, draft: EditDraft) -> 
         "activities": [item.model_dump() for item in draft.activities],
         "transport_segments": [item.model_dump() for item in draft.transport_segments],
     })
+    edited = refresh_edited_day_routes(itinerary, edited, draft.day_number)
     if not update_itinerary_if_unchanged(plan_id, edited, draft.source_fingerprint):
         raise ValueError("行程已变化，请重新生成草案")
     return {

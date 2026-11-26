@@ -15,6 +15,7 @@ from core.edit_draft_service import confirm_edit_draft, generate_edit_draft
 from core.config import LLMConfig
 from core.exceptions import LLMError
 from core.trip_edit import edit_day
+from core.trip_routes import refresh_edited_day_routes
 from core.llm_client import OpenAICompatibleClient
 from core.trip_models import Itinerary
 from core.trip_service import plan_trip
@@ -208,6 +209,7 @@ def update_plan_day(plan_id: str, day_number: int, raw: dict) -> dict:
 
     try:
         edited = edit_day(itinerary, day_number, raw)
+        edited = refresh_edited_day_routes(itinerary, edited, day_number)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
