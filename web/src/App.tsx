@@ -530,7 +530,7 @@ export default function App() {
     setRightWidth(clamp(widthsAtDragStart.current.right - dx, RIGHT_MIN, RIGHT_MAX))
   }
 
-  const gridColumns = `${leftWidth}px ${HANDLE_WIDTH}px minmax(${CENTER_MIN}px, 1fr) ${HANDLE_WIDTH}px ${rightWidth}px`
+  const gridColumns = `${leftWidth}px ${HANDLE_WIDTH}px minmax(${CENTER_MIN}px, 1fr)`
   const latestChoice = [...currentChat.messages].reverse().find((message) => message.activityChoice)?.activityChoice
   const activeChoice = latestChoice?.selected === 'alternatives' ? latestChoice : undefined
   const previewCandidates = selected && activeChoice ? replacementCandidates(selected.itinerary, activeChoice.target) : []
@@ -559,6 +559,7 @@ export default function App() {
           ))}
         </div>
       )}
+      <div className="workspace-panels" style={{ gridTemplateColumns: `minmax(486px, 1fr) ${HANDLE_WIDTH}px ${rightWidth}px` }}>
       <FloatingWorkspace>
       <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
       <aside className="pane pane-history" aria-label="对话列表">
@@ -673,8 +674,13 @@ export default function App() {
         </div>
       </main>
 
+      </div>
+      </FloatingWorkspace>
+
       <ResizeHandle label="调整行程详情栏宽度" onDragStart={beginDrag} onDrag={dragRight} />
 
+      <div className="floating-workspace details-workspace">
+        <div className="workspace-grip details-grip" aria-label="行程详情面板把手（自由拖动将在下一阶段接入）"><span /></div>
       <section id="plan-details" className="pane pane-details" aria-label="行程详情">
         <h2>行程详情</h2>
         {selected ? (
@@ -694,7 +700,7 @@ export default function App() {
         ) : <p className="muted details-empty">生成旅行计划后，在这里查看行程详情。</p>}
       </section>
       </div>
-      </FloatingWorkspace>
+      </div>
     </div>
   )
 }
