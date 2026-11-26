@@ -32,7 +32,8 @@ class TripRoutesTests(unittest.TestCase):
         query.assert_called_once_with(self.trip.places[0], self.trip.places[1], "walking")
         self.assertEqual(result.daily_plans[0].transport_segments[0].estimated_minutes, 2)
         self.assertIsNone(self.trip.daily_plans[0].transport_segments[0].route)
-        self.assertEqual(build_map_days(result), build_map_days(self.trip))
+        self.assertEqual(build_map_days(result)[0]["stops"], build_map_days(self.trip)[0]["stops"])
+        self.assertEqual(build_map_days(result)[0]["segments"][0]["kind"], "route_snapshot")
         with TemporaryDirectory() as directory:
             db = Path(directory) / "trips.db"
             save_itinerary("test", result, db)

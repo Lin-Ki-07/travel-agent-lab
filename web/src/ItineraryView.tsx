@@ -96,7 +96,7 @@ export default function ItineraryView({
                   </li>
                 ))}
               </ul>
-              <p className="muted">路线为查询快照；地图当前仍显示地点顺序示意线。</p>
+              <p className="muted">路线为查询快照。</p>
             </div>
           )}
 

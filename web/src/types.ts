@@ -89,6 +89,15 @@ export interface MapDay {
   plan_date: string
   stops: MapStop[]
   line: MapLine
+  segments?: MapSegment[]
+}
+
+export interface MapSegment {
+  from_order: number
+  to_order: number
+  kind: 'route_snapshot' | 'place_order_schematic'
+  parts: RoutePart[]
+  fallback_positions: [number, number][]
 }
 
 export interface Itinerary {
