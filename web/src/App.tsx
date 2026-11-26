@@ -48,6 +48,8 @@ interface Chat {
   messages: ChatMessage[]
   draft: string
   parsing: boolean
+  generation: 'idle' | 'loading' | 'error' | 'ready'
+  generationError: string
   formOpen: boolean
   prefill: TripFormValues | null
   formKey: number
@@ -62,6 +64,8 @@ function createChat(): Chat {
     messages: [],
     draft: '',
     parsing: false,
+    generation: 'idle',
+    generationError: '',
     formOpen: false,
     prefill: null,
     formKey: 0,
@@ -107,7 +111,6 @@ export default function App() {
   const [saving, setSaving] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
-  const [detailsChatId, setDetailsChatId] = useState<string | null>(null)
   const [mapDayIndex, setMapDayIndex] = useState(0)
   const [leftWidth, setLeftWidth] = useState(240)
   const [rightWidth, setRightWidth] = useState(420)
@@ -198,19 +201,17 @@ export default function App() {
     setNotice(null)
     const chat = createChat()
     setChats((prev) => [chat, ...prev])
-    setDetailsChatId(null)
     setSelectedId(chat.id)
   }
 
   function handleGenerated(chatId: string, result: CreatePlanResponse) {
     setChats((prev) => prev.map((chat) => chat.id === chatId
-      ? { ...chat, plan: result, messages: [...chat.messages, { role: 'assistant', text: '', planCard: true }] }
+      ? { ...chat, plan: result, generation: 'ready', generationError: '', formOpen: false, messages: [...chat.messages, { role: 'assistant', text: '', planCard: true }] }
       : chat))
   }
 
   function handleSelect(planId: string) {
     setNotice(null)
-    setDetailsChatId(null)
     setSelectedId(planId)
   }
 
@@ -225,14 +226,12 @@ export default function App() {
 
       if (existing) {
         updateChat(existing.id, { plan: result })
-        setDetailsChatId(null)
     setSelectedId(existing.id)
       } else {
         const chat = createChat()
         chat.plan = result
         chat.title = `${result.itinerary.request.destination}旅游攻略`
         setChats((prev) => [chat, ...prev])
-        setDetailsChatId(null)
     setSelectedId(chat.id)
       }
       setSavedIds((prev) => new Set(prev).add(planId))
@@ -266,7 +265,6 @@ export default function App() {
       const nextChats = remaining.length ? remaining : [createChat()]
       setChats(nextChats)
       if (removedChatIds.includes(selectedId)) {
-        setDetailsChatId(null)
     setSelectedId(nextChats[0].id)
       }
       if (planId) {
@@ -459,12 +457,15 @@ export default function App() {
         }])
       } else {
         appendMessages(chatId, [{ role: 'assistant', text: '信息已齐全，正在生成行程…', pending: true }])
+        updateChat(chatId, { generation: 'loading', generationError: '' })
         const plan = await createPlan(toRequestBody(merged))
         removePendingMessage(chatId)
         handleGenerated(chatId, plan)
       }
     } catch (error) {
       removePendingMessage(chatId)
+      setChats((prev) => prev.map((chat) => chat.id === chatId && chat.generation === 'loading'
+        ? { ...chat, generation: 'error', generationError: errorText(error, '请稍后重试。') } : chat))
       appendMessages(chatId, [
         {
           role: 'assistant',
@@ -606,6 +607,7 @@ export default function App() {
                 prefill={chat.prefill}
                 formKey={chat.formKey}
                 onGenerated={(result) => handleGenerated(chat.id, result)}
+                onGenerationChange={(generation, generationError = '') => updateChat(chat.id, { generation, generationError })}
               />
             </div>
           ))}
@@ -615,8 +617,8 @@ export default function App() {
               <PlanResultView
                 key={`${selected.plan_id}-${index}`}
                 plan={selected}
-                onOpen={() => setDetailsChatId(currentChat.id)}
-                active={detailsChatId === currentChat.id}
+                onOpen={() => document.getElementById('plan-details')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
+                active
               />
             ) : (
               <div key={index} className={`chat-bubble ${message.role}`}>
@@ -654,8 +656,8 @@ export default function App() {
             <PlanResultView
               key={selected.plan_id}
               plan={selected}
-                onOpen={() => setDetailsChatId(currentChat.id)}
-                active={detailsChatId === currentChat.id}
+                onOpen={() => document.getElementById('plan-details')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
+                active
             />
           )}
         </div>
@@ -675,10 +677,21 @@ export default function App() {
 
       <section id="plan-details" className="pane pane-details" aria-label="行程详情">
         <h2>行程详情</h2>
-        {selected && detailsChatId === currentChat.id ? (
+        {selected ? (
           <PlanDetails key={currentChat.id} plan={selected} notice={notice} isSaved={isSaved}
             saving={saving} savingEdit={savingEdit} onSave={handleSave} onEditDay={handleEditDay} />
-        ) : <p className="muted details-empty">{selected ? '点击对话中的旅行计划，查看完整行程。' : '生成旅行计划后，在这里查看行程详情。'}</p>}
+        ) : currentChat.generation === 'loading' ? (
+          <div className="banner banner-pending" role="status" aria-live="polite">
+            旅行计划正在生成中…
+            <p>正在整理地点、天气与路线，请稍候。</p>
+          </div>
+        ) : currentChat.generation === 'error' ? (
+          <div className="banner banner-error" role="alert">
+            <strong>旅行计划生成失败</strong>
+            <p>{currentChat.generationError}</p>
+            <button type="button" onClick={() => updateChat(currentChat.id, { formOpen: true })}>检查需求并重试</button>
+          </div>
+        ) : <p className="muted details-empty">生成旅行计划后，在这里查看行程详情。</p>}
       </section>
       </div>
       </FloatingWorkspace>

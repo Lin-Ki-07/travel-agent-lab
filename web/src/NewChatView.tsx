@@ -10,6 +10,7 @@ interface NewChatViewProps {
   // 解析结果：有值时表单以这些字段初始化；formKey 变化会重新挂载表单。
   prefill: TripFormValues | null
   formKey: number
+  onGenerationChange: (state: 'loading' | 'error', error?: string) => void
   onGenerated: (result: CreatePlanResponse) => void
 }
 
@@ -22,6 +23,7 @@ export default function NewChatView({
   prefill,
   formKey,
   onGenerated,
+  onGenerationChange,
 }: NewChatViewProps) {
   return (
     <div className="new-chat">
@@ -60,6 +62,7 @@ export default function NewChatView({
             defaultPreferences={defaultPreferences}
             preferencesLoaded={preferencesLoaded}
             onGenerated={onGenerated}
+            onGenerationChange={onGenerationChange}
           />
         </div>
       </div>
