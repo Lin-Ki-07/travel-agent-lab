@@ -1147,3 +1147,14 @@ body {
   background: #1b1e24f5;
   border-color: #ffffff24;
 }
+.workspace-panels.details-detached > .floating-workspace:first-child,
+.workspace-panels > .details-workspace.is-detached {
+  border-radius: 28px; border: 1px solid #ffffffa0;
+  box-shadow: 0 20px 70px #172e4030, 0 2px 8px #172e4012;
+}
+:root[data-theme='dark'] .workspace-panels.details-detached > .floating-workspace:first-child,
+:root[data-theme='dark'] .workspace-panels > .details-workspace.is-detached { border-color: #ffffff24; }
+.workspace-panels.details-detached > .resize-handle { visibility: hidden; }
+.details-workspace.is-detached { z-index: 10; box-sizing: border-box; transition: none; }
+.details-grip { cursor: grab; }
+.is-moving .details-grip { cursor: grabbing; }

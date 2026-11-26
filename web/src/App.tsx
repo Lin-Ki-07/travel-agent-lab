@@ -25,6 +25,7 @@ import MapPanel from './MapPanel'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
 import FloatingWorkspace from './FloatingWorkspace'
+import DraggableDetails from './DraggableDetails'
 import { findReplacementTargets, type ActivityTarget } from './editIntent'
 import { prepareActivityRemoval } from './removeActivity'
 import { replacementCandidates } from './replacementCandidates'
@@ -111,6 +112,7 @@ export default function App() {
   const [saving, setSaving] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
+  const [detailsDetached, setDetailsDetached] = useState(false)
   const [mapDayIndex, setMapDayIndex] = useState(0)
   const [leftWidth, setLeftWidth] = useState(240)
   const [rightWidth, setRightWidth] = useState(420)
@@ -559,7 +561,7 @@ export default function App() {
           ))}
         </div>
       )}
-      <div className="workspace-panels" style={{ gridTemplateColumns: `minmax(486px, 1fr) ${HANDLE_WIDTH}px ${rightWidth}px` }}>
+      <div className={`workspace-panels${detailsDetached ? ' details-detached' : ''}`} style={{ gridTemplateColumns: `minmax(486px, 1fr) ${HANDLE_WIDTH}px ${rightWidth}px` }}>
       <FloatingWorkspace>
       <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
       <aside className="pane pane-history" aria-label="对话列表">
@@ -679,8 +681,7 @@ export default function App() {
 
       <ResizeHandle label="调整行程详情栏宽度" onDragStart={beginDrag} onDrag={dragRight} />
 
-      <div className="floating-workspace details-workspace">
-        <div className="workspace-grip details-grip" aria-label="行程详情面板把手（自由拖动将在下一阶段接入）"><span /></div>
+      <DraggableDetails onDetach={() => setDetailsDetached(true)}>
       <section id="plan-details" className="pane pane-details" aria-label="行程详情">
         <h2>行程详情</h2>
         {selected ? (
@@ -699,7 +700,7 @@ export default function App() {
           </div>
         ) : <p className="muted details-empty">生成旅行计划后，在这里查看行程详情。</p>}
       </section>
-      </div>
+      </DraggableDetails>
       </div>
     </div>
   )
