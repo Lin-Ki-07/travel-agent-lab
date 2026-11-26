@@ -6,6 +6,7 @@ import {
   describeDay,
   formatCost,
   formatSegmentDuration,
+  formatRouteDetails,
   formatTimeRange,
   formatWeather,
   placeNameById,
@@ -91,9 +92,11 @@ export default function ItineraryView({
                   <li key={index}>
                     {placeNameById(places, segment.from_place_id)} → {placeNameById(places, segment.to_place_id)}
                     ：{segment.mode}，{formatSegmentDuration(segment)}
+                    <div className="muted">{formatRouteDetails(segment)}</div>
                   </li>
                 ))}
               </ul>
+              <p className="muted">路线为查询快照；地图当前仍显示地点顺序示意线。</p>
             </div>
           )}
 

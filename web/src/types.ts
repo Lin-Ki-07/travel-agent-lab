@@ -28,11 +28,27 @@ export interface Activity {
   end_time: string
 }
 
+export interface RoutePart {
+  mode: string
+  positions: [number, number][]
+}
+
+export interface RouteSnapshot {
+  status: 'ok' | 'failed'
+  source: string
+  queried_at: string
+  distance_meters: number | null
+  duration_seconds: number | null
+  parts: RoutePart[]
+  failure_reason: string | null
+}
+
 export interface TransportSegment {
   from_place_id: string
   to_place_id: string
   mode: string
   estimated_minutes: number | null
+  route?: RouteSnapshot | null
 }
 
 export interface DailyPlan {
