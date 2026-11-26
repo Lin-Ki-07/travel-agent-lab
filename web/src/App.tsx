@@ -20,6 +20,7 @@ import {
 import ChatComposer from './ChatComposer'
 import HistoryPanel from './HistoryPanel'
 import PlanResultView from './PlanResultView'
+import PlanDetails from './PlanDetails'
 import MapPanel from './MapPanel'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
@@ -106,6 +107,7 @@ export default function App() {
   const [saving, setSaving] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
+  const [detailsChatId, setDetailsChatId] = useState<string | null>(null)
   const [mapDayIndex, setMapDayIndex] = useState(0)
   const [leftWidth, setLeftWidth] = useState(240)
   const [rightWidth, setRightWidth] = useState(420)
@@ -196,6 +198,7 @@ export default function App() {
     setNotice(null)
     const chat = createChat()
     setChats((prev) => [chat, ...prev])
+    setDetailsChatId(null)
     setSelectedId(chat.id)
   }
 
@@ -207,6 +210,7 @@ export default function App() {
 
   function handleSelect(planId: string) {
     setNotice(null)
+    setDetailsChatId(null)
     setSelectedId(planId)
   }
 
@@ -221,13 +225,15 @@ export default function App() {
 
       if (existing) {
         updateChat(existing.id, { plan: result })
-        setSelectedId(existing.id)
+        setDetailsChatId(null)
+    setSelectedId(existing.id)
       } else {
         const chat = createChat()
         chat.plan = result
         chat.title = `${result.itinerary.request.destination}旅游攻略`
         setChats((prev) => [chat, ...prev])
-        setSelectedId(chat.id)
+        setDetailsChatId(null)
+    setSelectedId(chat.id)
       }
       setSavedIds((prev) => new Set(prev).add(planId))
     } catch (error) {
@@ -260,7 +266,8 @@ export default function App() {
       const nextChats = remaining.length ? remaining : [createChat()]
       setChats(nextChats)
       if (removedChatIds.includes(selectedId)) {
-        setSelectedId(nextChats[0].id)
+        setDetailsChatId(null)
+    setSelectedId(nextChats[0].id)
       }
       if (planId) {
         setSavedPlans((prev) => prev.filter((plan) => plan.plan_id !== planId))
@@ -517,7 +524,7 @@ export default function App() {
     setLeftWidth(clamp(widthsAtDragStart.current.left + dx, LEFT_MIN, LEFT_MAX))
   }
 
-  // 右分隔条：向左拖动增加地图栏宽度。
+  // 右分隔条：向左拖动增加行程详情栏宽度。
   function dragRight(dx: number) {
     setRightWidth(clamp(widthsAtDragStart.current.right - dx, RIGHT_MIN, RIGHT_MAX))
   }
@@ -543,6 +550,14 @@ export default function App() {
           preview={previewTarget ? { target: previewTarget, candidates: previewCandidates, selectedId: activeChoice?.candidateId } : undefined}
           onSelectCandidate={selectPreviewCandidate} />
       </div>
+      {selected && selected.map_days.length > 0 && (
+        <div className="background-day-tabs day-tabs" role="group" aria-label="背景地图日期">
+          {selected.map_days.map((day, index) => (
+            <button key={day.day_number} type="button" className={index === Math.min(mapDayIndex, selected.map_days.length - 1) ? 'day-tab active' : 'day-tab'}
+              aria-pressed={index === Math.min(mapDayIndex, selected.map_days.length - 1)} onClick={() => setMapDayIndex(index)}>第 {day.day_number} 天</button>
+          ))}
+        </div>
+      )}
       <FloatingWorkspace>
       <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
       <aside className="pane pane-history" aria-label="对话列表">
@@ -600,12 +615,8 @@ export default function App() {
               <PlanResultView
                 key={`${selected.plan_id}-${index}`}
                 plan={selected}
-                notice={notice}
-                isSaved={isSaved}
-                saving={saving}
-                savingEdit={savingEdit}
-                onSave={handleSave}
-                onEditDay={handleEditDay}
+                onOpen={() => setDetailsChatId(currentChat.id)}
+                active={detailsChatId === currentChat.id}
               />
             ) : (
               <div key={index} className={`chat-bubble ${message.role}`}>
@@ -643,12 +654,8 @@ export default function App() {
             <PlanResultView
               key={selected.plan_id}
               plan={selected}
-              notice={notice}
-              isSaved={isSaved}
-              saving={saving}
-              savingEdit={savingEdit}
-              onSave={handleSave}
-              onEditDay={handleEditDay}
+                onOpen={() => setDetailsChatId(currentChat.id)}
+                active={detailsChatId === currentChat.id}
             />
           )}
         </div>
@@ -664,14 +671,14 @@ export default function App() {
         </div>
       </main>
 
-      <ResizeHandle label="调整地图栏宽度" onDragStart={beginDrag} onDrag={dragRight} />
+      <ResizeHandle label="调整行程详情栏宽度" onDragStart={beginDrag} onDrag={dragRight} />
 
-      <section className="pane pane-map" aria-label="地图">
-        <h2>地图</h2>
-        <MapPanel key={selected?.plan_id ?? 'empty'} days={selected?.map_days ?? []}
-          selectedDayIndex={mapDayIndex} onDayIndexChange={setMapDayIndex}
-          preview={previewTarget ? { target: previewTarget, candidates: previewCandidates, selectedId: activeChoice?.candidateId } : undefined}
-          onSelectCandidate={selectPreviewCandidate} />
+      <section id="plan-details" className="pane pane-details" aria-label="行程详情">
+        <h2>行程详情</h2>
+        {selected && detailsChatId === currentChat.id ? (
+          <PlanDetails key={currentChat.id} plan={selected} notice={notice} isSaved={isSaved}
+            saving={saving} savingEdit={savingEdit} onSave={handleSave} onEditDay={handleEditDay} />
+        ) : <p className="muted details-empty">{selected ? '点击对话中的旅行计划，查看完整行程。' : '生成旅行计划后，在这里查看行程详情。'}</p>}
       </section>
       </div>
       </FloatingWorkspace>

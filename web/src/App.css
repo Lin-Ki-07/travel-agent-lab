@@ -1103,3 +1103,11 @@ body {
 }
 @media (prefers-reduced-motion: reduce) { .floating-workspace { transition: none; } }
 .workspace-map { z-index: 0; }
+.pane-details { border-right: 0; }
+.details-empty { margin-top: 24px; line-height: 1.8; }
+.plan-details { overflow-wrap: anywhere; }
+.plan-details .plan-toolbar { flex-wrap: wrap; }
+.plan-result-card[aria-expanded='true'] { border-color: #2a71d3; }
+.background-day-tabs { position: absolute; z-index: 2; top: 6px; left: 4vw; right: 4vw; flex-wrap: nowrap; overflow-x: auto; }
+.background-day-tabs .day-tab { flex-shrink: 0; background: #f7f8fa; color: #1c2430; }
+.background-day-tabs .day-tab.active { background: #2a71d3; color: white; }
