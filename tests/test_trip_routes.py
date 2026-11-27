@@ -317,3 +317,20 @@ class TripRoutesTests(unittest.TestCase):
             result = complete_missing_routes(trip)
         query.assert_not_called()
         self.assertIs(result.daily_plans[0].transport_segments[0], segment)
+
+
+    def test_real_adapter_parse_failure_stops_before_driving(self):
+        trip = replace(self.trip, request=replace(self.trip.request, preferences=[]),
+                       places=[replace(p, citycode="010") for p in self.trip.places])
+        for plans, expected in (([None], "unavailable"), ([], "no_route")):
+            with self.subTest(plans=plans), patch.dict("os.environ", {"AMAP_API_KEY": "test-key"}), patch(
+                    "tools.amap_route_tool.requests.get") as get:
+                get.return_value.json.return_value = {"status": "1", "route": {"transits": plans, "paths": []}}
+                segment = enrich_trip_routes(trip).daily_plans[0].transport_segments[0]
+                self.assertEqual(get.call_count, 1 if plans else 2)
+                self.assertTrue(get.call_args_list[0].args[0].endswith('/transit/integrated'))
+                if not plans:
+                    self.assertTrue(get.call_args_list[1].args[0].endswith('/driving'))
+                self.assertEqual(segment.route.failure_kind, expected)
+                self.assertEqual(segment.route.parts, [])
+                self.assertIsNone(segment.estimated_minutes)

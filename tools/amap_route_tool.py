@@ -144,4 +144,4 @@ def query_amap_route(
             return min(subways, key=lambda route: route.duration_seconds) if subways else fastest
     except (KeyError, TypeError, ValueError, IndexError, OverflowError, AttributeError):
         pass
-    return failed("高德路线方案缺少有效距离、耗时或完整几何", "no_route")
+    return failed("高德路线方案缺少有效距离、耗时或完整几何", "unavailable")

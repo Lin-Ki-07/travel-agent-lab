@@ -120,6 +120,7 @@ class AmapRouteTests(unittest.TestCase):
                 route = self.query("transit", origin_citycode="010", destination_citycode="010")
                 get.assert_called_once()
                 self.assertEqual(route.status, "failed")
+                self.assertEqual(route.failure_kind, "no_route" if not plans else "unavailable")
                 self.assertTrue(route.failure_reason)
                 self.assertEqual(route.parts, [])
                 self.assertIsNone(route.distance_meters)
@@ -167,3 +168,17 @@ class AmapRouteTests(unittest.TestCase):
                 self.assertEqual(parse_route_snapshot(raw), route)
                 del raw["failure_kind"]
                 self.assertIsNone(parse_route_snapshot(raw).failure_kind)
+
+
+    def test_malformed_route_container_is_unavailable_not_no_route(self):
+        for mode, field in (("walking", "paths"), ("transit", "transits")):
+            for data in ({"status": "1"}, {"status": "1", "route": {}},
+                         {"status": "1", "route": {field: None}},
+                         {"status": "1", "route": {field: [None]}}):
+                with self.subTest(mode=mode, data=data), patch("tools.amap_route_tool.requests.get") as get:
+                    get.return_value.json.return_value = data
+                    options = {"origin_citycode": "010", "destination_citycode": "010"} if mode == "transit" else {}
+                    route = self.query(mode, **options)
+                    self.assertEqual(route.failure_kind, "unavailable")
+                    self.assertEqual(route.parts, [])
+                    get.assert_called_once()
