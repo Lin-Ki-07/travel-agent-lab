@@ -22,31 +22,35 @@ test('每个 part 独立绘制并按方式配色，不跨 part 拼接或叠加�
   assert.equal(spec.markers.length, 3)
 })
 
-test('局部失败只回退该交通段，全失败仍保留全部连接', () => {
+test('局部失败不连线，全失败保留标记且不画线', () => {
   const failed = { ...segment, from_order: 2, to_order: 3,
     kind: 'place_order_schematic', parts: [], fallback_positions: [b, c] }
   const spec = buildOverlaySpec({ ...day, segments: [segment, failed] })
-  assert.deepEqual(spec.lines.map(l => l.dashed), [false, true])
-  assert.deepEqual(spec.lines[1].path, [b, c])
-  assert.ok(spec.label.includes('灰色虚线'))
-  assert.ok(buildOverlaySpec({ ...day, segments: [failed, failed] }).lines.every(l => l.dashed))
+  assert.deepEqual(spec.lines.map(l => l.dashed), [false])
+  assert.deepEqual(spec.lines[0].path, [a, b])
+  assert.ok(!spec.label.includes('灰色'))
+  assert.equal(spec.markers.length, 3)
+  const failedSpec = buildOverlaySpec({ ...day, segments: [failed, failed] })
+  assert.equal(failedSpec.lines.length, 0)
+  assert.equal(failedSpec.markers.length, 3)
+  assert.equal(failedSpec.label, '')
 })
 
-test('坏坐标或未知方式令整条交通段回退，不删坏点后误连', () => {
+test('坏坐标或未知方式跳过整条交通段，保留标记', () => {
   for (const part of [
     { mode: 'walking', positions: [a, [NaN, 30], b] },
     { mode: 'walking', positions: [a] },
     { mode: 'railway', positions: [a, b] },
   ]) {
     const spec = buildOverlaySpec({ ...day, segments: [{ ...segment, parts: [segment.parts[0], part] }] })
-    assert.equal(spec.lines.length, 1)
-    assert.equal(spec.lines[0].dashed, true)
-    assert.deepEqual(spec.lines[0].path, [a, b])
+    assert.equal(spec.lines.length, 0)
+    assert.equal(spec.markers.length, 3)
   }
 })
 
 test('旧地图响应兼容，空交通段不画线，日期索引保持原行为', () => {
-  assert.deepEqual(buildOverlaySpec(day).lines[0].path, [a, b, c])
+  assert.equal(buildOverlaySpec(day).lines.length, 0)
+  assert.equal(buildOverlaySpec(day).markers.length, 3)
   assert.equal(buildOverlaySpec({ ...day, segments: [] }).lines.length, 0)
   assert.equal(buildOverlaySpec({ ...day, stops: [stops[0]], segments: [] }).markers.length, 1)
   assert.equal(clampDayIndex(4, 2), 1)

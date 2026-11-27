@@ -26,7 +26,7 @@ export function formatCost(cost: number | null): string {
 
 export function formatSegmentDuration(segment: TransportSegment): string {
   const route = segment.route
-  if (route?.status === 'failed') return '耗时未知'
+  if (route?.status === 'failed') return '该段路线不可用'
   if (route?.status === 'ok' && route.duration_seconds !== null) {
     const distance = route.distance_meters
     const distanceText = distance === null ? '' : distance < 1000
@@ -34,23 +34,19 @@ export function formatSegmentDuration(segment: TransportSegment): string {
       : ` · 约 ${Number((distance / 1000).toFixed(1))} 公里`
     return `预计 ${Math.ceil(route.duration_seconds / 60)} 分钟${distanceText}`
   }
-  return segment.estimated_minutes === null
-    ? '耗时未知'
-    : `原估计 ${segment.estimated_minutes} 分钟（未经路线查询核实）`
+  return '该段路线未查询'
 }
 
 export function formatRouteDetails(segment: TransportSegment): string {
   const route = segment.route
-  if (!route) return '无路线查询快照'
+  if (!route || route.status !== 'ok') return ''
   const source = route.source === 'amap' ? '高德' : route.source
   const date = new Date(route.queried_at)
   const timestamp = Number.isNaN(date.getTime()) ? '未知' : new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date)
-  const timeLabel = route.status === 'ok' ? '查询时间' : '记录时间'
-  const reason = route.status === 'failed' ? `路线未获取：${route.failure_reason ?? '原因未知'}；` : ''
-  return `${reason}来源：${source}；${timeLabel}：${timestamp}（北京时间）`
+  return `来源：${source}；查询时间：${timestamp}（北京时间）`
 }
 
 // 总费用为 null 时，无法判断是否符合预算。

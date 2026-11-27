@@ -5,7 +5,7 @@ import type { MapDay, Place } from './types'
 import type { ActivityTarget } from './editIntent'
 
 interface MapPanelProps {
-  // 没有行程时传入空数组：地图仍显示（全国视野），但不绘制标记和示意线。
+  // 没有行程时传入空数组：地图仍显示（全国视野），但不绘制标记和路线。
   days: MapDay[]
   preview?: { target: ActivityTarget; candidates: Place[]; selectedId?: string }
   onSelectCandidate?: (placeId: string) => void
@@ -179,7 +179,7 @@ export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelP
       </div>
 
       {days.length === 0 ? (
-        <p className="muted">选择或生成一个行程后，这里按日期显示地点与示意线。</p>
+        <p className="muted">选择或生成一个行程后，这里按日期显示地点与可用路线。</p>
       ) : (
         currentDay && (
           <>

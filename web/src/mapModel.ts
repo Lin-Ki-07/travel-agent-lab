@@ -36,26 +36,14 @@ export function buildOverlaySpec(day: MapDay): DayOverlaySpec {
 
   const lines: DayOverlaySpec['lines'] = []
   const modes = new Set<string>()
-  let fallback = false
   const validPath = (points: unknown): points is [number, number][] =>
     Array.isArray(points) && points.length >= 2 && points.every(isValidPosition)
-  const addFallback = (points: unknown) => {
-    if (validPath(points)) {
-      lines.push({ path: points, color: '#808080', dashed: true })
-      fallback = true
-    }
-  }
-  if (day.segments === undefined) {
-    addFallback(day.line.positions)
-  } else {
+  if (day.segments !== undefined) {
     for (const segment of day.segments) {
       const usable = segment.kind === 'route_snapshot' && Array.isArray(segment.parts) &&
         segment.parts.length > 0 && segment.parts.every((part) =>
           ['walking', 'driving', 'transit'].includes(part.mode) && validPath(part.positions))
-      if (!usable) {
-        addFallback(segment.fallback_positions)
-        continue
-      }
+      if (!usable) continue
       for (const part of segment.parts) {
         const style = part.mode === 'walking' ? { color: '#238636', name: '绿色：步行' }
           : part.mode === 'driving' ? { color: '#2a71d3', name: '蓝色：驾车' }
@@ -67,7 +55,6 @@ export function buildOverlaySpec(day: MapDay): DayOverlaySpec {
   }
   const label = lines.length === 0 ? '' : [
     ...modes, modes.size > 0 ? '实线为路线快照' : '',
-    fallback ? '灰色虚线为地点顺序示意线，非实际道路路线' : '',
   ].filter(Boolean).join('；')
   return { markers, lines, label }
 }

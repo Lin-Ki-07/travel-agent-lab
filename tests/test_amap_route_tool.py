@@ -124,3 +124,30 @@ class AmapRouteTests(unittest.TestCase):
                 self.assertEqual(route.parts, [])
                 self.assertIsNone(route.distance_meters)
                 self.assertIsNone(route.duration_seconds)
+
+    def test_subway_preference_thresholds_and_stable_ties(self):
+        def plan(seconds, kind=None, name="地铁名称不能代替类型", distance="1200"):
+            return {"distance": distance, "cost": {"duration": str(seconds)}, "segments": [{
+                "bus": {"buslines": [{"polyline": self.polyline, "type": kind, "name": name}]}}]}
+        cases = [
+            ([plan(600), plan(750, "地铁线路")], 750),
+            ([plan(600), plan(751, "地铁线路")], 600),
+            ([plan(3600), plan(4500, "地铁线路")], 4500),
+            ([plan(4000), plan(4901, "地铁线路")], 4000),
+            ([plan(900), plan(600), plan(700)], 600),
+            ([plan(600), plan(700, None)], 600),
+            ([plan(600), plan(700, "普通公交")], 600),
+            ([plan(600), plan(740, "地铁线路"), plan(700, "地铁线路")], 700),
+            ([plan(600), {**plan(650, "地铁线路"), "segments": []}], 600),
+        ]
+        for plans, seconds in cases:
+            with self.subTest(seconds=seconds, plans=plans), patch("tools.amap_route_tool.requests.get") as get:
+                get.return_value.json.return_value = {"status": "1", "route": {"transits": plans}}
+                route = self.query("transit", origin_citycode="010", destination_citycode="010")
+                get.assert_called_once()
+                self.assertEqual(get.call_args.kwargs["params"]["AlternativeRoute"], "5")
+                self.assertEqual(route.duration_seconds, seconds)
+        with patch("tools.amap_route_tool.requests.get") as get:
+            get.return_value.json.return_value = {"status": "1", "route": {"transits": [
+                plan(600, distance="1000"), plan(600, distance="2000")]}}
+            self.assertEqual(self.query("transit", origin_citycode="010", destination_citycode="010").distance_meters, 1000)

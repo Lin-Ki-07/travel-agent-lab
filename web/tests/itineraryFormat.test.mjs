@@ -16,18 +16,17 @@ test('成功路线按秒取整并显示距离、来源及北京时间', () => {
     '预计 3 分钟 · 约 1.3 公里')
 })
 
-test('失败隐藏残留分钟，公交未查询使用记录时间', () => {
+test('失败仅显示不可用，隐藏残留分钟和详细原因', () => {
   const value = { ...segment, route: { ...route, status: 'failed', distance_meters: null,
     duration_seconds: null, failure_reason: '公交查询缺少可靠城市编码，未查询路线' } }
-  assert.equal(formatSegmentDuration(value), '耗时未知')
-  assert.equal(formatRouteDetails(value),
-    '路线未获取：公交查询缺少可靠城市编码，未查询路线；来源：高德；记录时间：2026-11-26 14:30（北京时间）')
+  assert.equal(formatSegmentDuration(value), '该段路线不可用')
+  assert.equal(formatRouteDetails(value), '')
 })
 
-test('旧行程区分原估计与未知，不伪造来源', () => {
+test('旧行程显示未查询，不展示原估计或伪造来源', () => {
   for (const route of [undefined, null]) {
-    assert.equal(formatSegmentDuration({ ...segment, route }), '原估计 99 分钟（未经路线查询核实）')
-    assert.equal(formatRouteDetails({ ...segment, route }), '无路线查询快照')
-    assert.equal(formatSegmentDuration({ ...segment, route, estimated_minutes: null }), '耗时未知')
+    assert.equal(formatSegmentDuration({ ...segment, route }), '该段路线未查询')
+    assert.equal(formatRouteDetails({ ...segment, route }), '')
+    assert.equal(formatSegmentDuration({ ...segment, route, estimated_minutes: null }), '该段路线未查询')
   }
 })

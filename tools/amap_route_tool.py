@@ -52,6 +52,15 @@ def _parts(plan: dict, mode: str) -> list[RoutePart]:
     return result
 
 
+def _has_subway(plan: dict) -> bool:
+    # 官方v3公交字段定义（v5引用）：type为“地铁线路”。仅检查实际采用的首条busline。
+    return any(
+        lines and lines[0].get("type") == "地铁线路"
+        for segment in plan["segments"]
+        for lines in [(segment.get("bus") or {}).get("buslines") or []]
+    )
+
+
 def query_amap_route(
     origin: Place,
     destination: Place,
@@ -63,7 +72,7 @@ def query_amap_route(
     departure_date: date | None = None,
     departure_time: time | None = None,
 ) -> RouteSnapshot:
-    """公交取响应中首个完整可用方案，道路取首条；单次请求，不重试。"""
+    """公交在可用方案中按耗时及地铁偏好选择，道路取首条；单次请求，不重试。"""
     queried_at = datetime.now(timezone.utc)
 
     def failed(reason: str) -> RouteSnapshot:
@@ -85,7 +94,7 @@ def query_amap_route(
         if any(not isinstance(code, str) or not code.isascii() or not code.isdecimal()
                for code in (origin_citycode, destination_citycode)):
             return failed("公交查询缺少有效城市编码")
-        params.update(city1=origin_citycode, city2=destination_citycode, AlternativeRoute="1")
+        params.update(city1=origin_citycode, city2=destination_citycode, AlternativeRoute="5")
         if departure_date is not None:
             params["date"] = departure_date.isoformat()
         if departure_time is not None:
@@ -112,16 +121,26 @@ def query_amap_route(
         if not plans:
             return failed("高德未返回可用路线")
         # 只在同一公交响应内选方案，不为损坏方案增加网络请求。
+        candidates = []
         for plan in (plans if mode == "transit" else plans[:1]):
             try:
-                return RouteSnapshot(
+                snapshot = RouteSnapshot(
                     "ok", "amap", queried_at,
                     distance_meters=_positive_integer(plan["distance"]),
                     duration_seconds=_positive_integer(plan["cost"]["duration"]),
                     parts=_parts(plan, mode),
                 )
+                if mode != "transit":
+                    return snapshot
+                candidates.append((snapshot, _has_subway(plan)))
             except (KeyError, TypeError, ValueError, IndexError, OverflowError, AttributeError):
                 continue
+        if candidates:
+            fastest = min(candidates, key=lambda candidate: candidate[0].duration_seconds)[0]
+            subways = [route for route, has_subway in candidates if has_subway
+                       and route.duration_seconds - fastest.duration_seconds <= 900
+                       and route.duration_seconds * 4 <= fastest.duration_seconds * 5]
+            return min(subways, key=lambda route: route.duration_seconds) if subways else fastest
     except (KeyError, TypeError, ValueError, IndexError, OverflowError, AttributeError):
         pass
     return failed("高德路线方案缺少有效距离、耗时或完整几何")

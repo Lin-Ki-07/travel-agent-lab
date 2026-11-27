@@ -92,7 +92,7 @@ export default function ItineraryView({
                   <li key={index}>
                     {placeNameById(places, segment.from_place_id)} → {placeNameById(places, segment.to_place_id)}
                     ：{segment.mode}，{formatSegmentDuration(segment)}
-                    <div className="muted">{formatRouteDetails(segment)}</div>
+                    {formatRouteDetails(segment) && <div className="muted">{formatRouteDetails(segment)}</div>}
                   </li>
                 ))}
               </ul>
