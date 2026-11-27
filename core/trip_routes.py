@@ -50,9 +50,9 @@ def _query_segment_route(segment, places, plan_date):
                                    departure_date=plan_date)
         if transit.status == "ok" or transit.failure_kind != "no_route":
             return transit, segment.mode
-    # 缺城市编码或明确无可用方案时才尝试打车；未知/权限/配额/参数故障停止。
+    # 缺城市编码或明确无可用方案时才尝试驾车；未知/权限/配额/参数故障停止。
     driving = query_amap_route(origin, destination, "driving")
-    return driving, "打车" if driving.status == "ok" else segment.mode
+    return driving, "驾车" if driving.status == "ok" else segment.mode
 
 
 def enrich_trip_routes(itinerary: Itinerary) -> Itinerary:

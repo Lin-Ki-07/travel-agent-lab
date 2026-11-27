@@ -63,3 +63,8 @@ export function budgetStatus(itinerary: Itinerary): string {
 export function describeDay(day: DailyPlan): string {
   return `第 ${day.day_number} 天 · ${day.plan_date}`
 }
+
+
+export function formatTransportMode(mode: string): string {
+  return ['打车', '出租车', 'taxi'].includes(mode.trim().toLowerCase()) ? '驾车' : mode
+}

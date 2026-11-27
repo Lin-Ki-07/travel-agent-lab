@@ -196,6 +196,8 @@ def update_itinerary_if_unchanged(
                 place.setdefault("citycode", None)
             for day in data["daily_plans"]:
                 for segment in day["transport_segments"]:
+                    if segment["mode"].strip().lower() in ("打车", "出租车", "taxi"):
+                        segment["mode"] = "驾车"
                     if segment.get("route") is not None:
                         segment["route"].setdefault("failure_kind", None)
             current = json.dumps(data, ensure_ascii=False, sort_keys=True)

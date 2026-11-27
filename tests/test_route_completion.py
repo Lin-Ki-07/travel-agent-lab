@@ -67,3 +67,17 @@ class RouteCompletionTests(unittest.TestCase):
                 api.complete_plan_routes("missing")
         self.assertEqual(caught.exception.status_code, 404)
         query.assert_not_called()
+
+    def test_legacy_taxi_read_normalizes_without_write_and_fingerprint_can_save(self):
+        save_itinerary("test", self.trip, self.db)
+        with sqlite3.connect(self.db) as connection:
+            data = json.loads(connection.execute("SELECT itinerary_json FROM saved_plans").fetchone()[0])
+            data["daily_plans"][0]["transport_segments"][0]["mode"] = "taxi"
+            raw = json.dumps(data)
+            connection.execute("UPDATE saved_plans SET itinerary_json=?", (raw,))
+        restored = load_itinerary("test", self.db)
+        self.assertEqual(restored.daily_plans[0].transport_segments[0].mode, "驾车")
+        with sqlite3.connect(self.db) as connection:
+            self.assertEqual(connection.execute("SELECT itinerary_json FROM saved_plans").fetchone()[0], raw)
+        from core.trip_store import itinerary_fingerprint
+        self.assertTrue(update_itinerary_if_unchanged("test", restored, itinerary_fingerprint(restored), self.db))

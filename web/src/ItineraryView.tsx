@@ -5,6 +5,7 @@ import type { Itinerary } from './types'
 import {
   describeDay,
   formatCost,
+  formatTransportMode,
   formatSegmentDuration,
   formatRouteDetails,
   formatTimeRange,
@@ -96,7 +97,7 @@ export default function ItineraryView({
                 {selectedDay.transport_segments.map((segment, index) => (
                   <li key={index}>
                     {placeNameById(places, segment.from_place_id)} → {placeNameById(places, segment.to_place_id)}
-                    ：{segment.mode}，{formatSegmentDuration(segment)}
+                    ：{formatTransportMode(segment.mode)}，{formatSegmentDuration(segment)}
                     {formatRouteDetails(segment) && <div className="muted">{formatRouteDetails(segment)}</div>}
                   </li>
                 ))}

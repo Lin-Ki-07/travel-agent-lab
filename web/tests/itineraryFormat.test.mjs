@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { formatSegmentDuration, formatRouteDetails } from '../src/itineraryFormat.ts'
+import { formatTransportMode, formatSegmentDuration, formatRouteDetails } from '../src/itineraryFormat.ts'
 
 const segment = { from_place_id: 'P1', to_place_id: 'P2', mode: '步行', estimated_minutes: 99 }
 const route = {
@@ -29,4 +29,10 @@ test('旧行程显示未查询，不展示原估计或伪造来源', () => {
     assert.equal(formatRouteDetails({ ...segment, route }), '')
     assert.equal(formatSegmentDuration({ ...segment, route, estimated_minutes: null }), '该段路线未查询')
   }
+})
+
+
+test('所有行程的旧交通别名统一展示驾车', () => {
+  for (const mode of ['打车', '出租车', ' TAXI ', '驾车']) assert.equal(formatTransportMode(mode), '驾车')
+  assert.equal(formatTransportMode('公共交通'), '公共交通')
 })

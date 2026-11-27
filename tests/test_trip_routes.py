@@ -141,7 +141,7 @@ class TripRoutesTests(unittest.TestCase):
                         result = enrich_trip_routes(trip)
                     query.assert_called_once_with(trip.places[0], trip.places[1], "driving")
                     segment = result.daily_plans[0].transport_segments[0]
-                    self.assertEqual(segment.mode, mode)
+                    self.assertEqual(segment.mode, "驾车" if mode.strip().lower() in ("打车", "出租车", "taxi") else mode)
                     self.assertEqual(segment.route, route)
                     self.assertEqual(segment.estimated_minutes, 2 if route.status == "ok" else None)
                     if route.status == "failed":
@@ -165,7 +165,7 @@ class TripRoutesTests(unittest.TestCase):
                 query.assert_not_called()
                 segment = result.daily_plans[0].transport_segments[0]
                 self.assertEqual((segment.mode, segment.route, segment.estimated_minutes),
-                                 (" TAXI ", route, minutes))
+                                 ("驾车", route, minutes))
 
     def test_edit_reuses_success_and_failure_with_mode_alias(self):
         for route, minutes in ((self.route, 2), (RouteSnapshot(
@@ -260,9 +260,9 @@ class TripRoutesTests(unittest.TestCase):
         driving = replace(self.route, parts=[replace(self.route.parts[0], mode="driving")])
         for distance, responses, modes, actual in (
             (800, [replace(self.route, distance_meters=1200, duration_seconds=1200)], ["walking"], "步行"),
-            (800, [replace(self.route, distance_meters=1201), no_route, driving], ["walking", "transit", "driving"], "打车"),
+            (800, [replace(self.route, distance_meters=1201), no_route, driving], ["walking", "transit", "driving"], "驾车"),
             (800, [replace(self.route, duration_seconds=1201), no_route, no_route], ["walking", "transit", "driving"], "公交"),
-            (801, [no_route, driving], ["transit", "driving"], "打车"),
+            (801, [no_route, driving], ["transit", "driving"], "驾车"),
             (800, [blocked], ["walking"], "公交"),
             (801, [blocked], ["transit"], "公交"),
             (801, [replace(no_route, failure_kind="unavailable")], ["transit"], "公交"),
@@ -288,4 +288,4 @@ class TripRoutesTests(unittest.TestCase):
             with self.subTest(mode=mode), patch("core.trip_routes._straight_distance", return_value=1), patch("core.trip_routes.query_amap_route", return_value=failed) as query:
                 result = enrich_trip_routes(trip)
                 query.assert_called_once_with(trip.places[0], trip.places[1], query_mode)
-                self.assertEqual(result.daily_plans[0].transport_segments[0].mode, mode)
+                self.assertEqual(result.daily_plans[0].transport_segments[0].mode, "驾车" if mode == "打车" else mode)

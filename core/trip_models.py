@@ -184,6 +184,8 @@ class TransportSegment:
     route: RouteSnapshot | None = None
 
     def __post_init__(self) -> None:
+        if self.mode.strip().lower() in ("打车", "出租车", "taxi"):
+            object.__setattr__(self, "mode", "驾车")
         if self.route is not None:
             if not isinstance(self.route, RouteSnapshot):
                 raise ValueError("路线快照类型不合法")
