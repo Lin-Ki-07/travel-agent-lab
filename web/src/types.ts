@@ -9,6 +9,7 @@ export interface Place {
   longitude: number
   source: string
   queried_at: string
+  citycode?: string | null
 }
 
 export interface WeatherSnapshot {

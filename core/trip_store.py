@@ -95,6 +95,7 @@ def load_itinerary(
             longitude=item["longitude"],
             source=item["source"],
             queried_at=datetime.fromisoformat(item["queried_at"]),
+            citycode=item.get("citycode"),
         )
         for item in data["places"]
     ]

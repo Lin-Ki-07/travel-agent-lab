@@ -77,6 +77,9 @@ def search_amap_places(
 
         address_value = poi.get("address")
         address = address_value.strip() if isinstance(address_value, str) else ""
+        citycode = poi.get("citycode")
+        if not isinstance(citycode, str) or not citycode.isascii() or not citycode.isdecimal():
+            citycode = None
 
         try:
             place = Place(
@@ -87,6 +90,7 @@ def search_amap_places(
                 longitude=longitude,
                 source="amap",
                 queried_at=queried_at,
+                citycode=citycode,
             )
         except ValueError:
             continue

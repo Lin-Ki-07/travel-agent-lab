@@ -100,12 +100,18 @@ class Place:
     longitude: float
     source: str
     queried_at: datetime
+    citycode: str | None = None
 
     def __post_init__(self) -> None:
         if not self.place_id.strip():
             raise ValueError("地点 ID 不能为空")
         if not self.name.strip():
             raise ValueError("地点名称不能为空")
+        if self.citycode is not None and (
+            not isinstance(self.citycode, str)
+            or not self.citycode.isascii() or not self.citycode.isdecimal()
+        ):
+            raise ValueError("城市编码必须为非空 ASCII 数字字符串或 None")
         if not self.source.strip():
             raise ValueError("地点来源不能为空")
         if not -90 <= self.latitude <= 90:

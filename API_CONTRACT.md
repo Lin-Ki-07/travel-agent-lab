@@ -90,7 +90,9 @@ budget_cny、preferences。前端传字符串，与现有 parse_trip_request
 ```
 
 itinerary 由现有规划与校验流程生成。places 保留高德 place_id、
-name、address、latitude、longitude、source、queried_at；
+name、address、latitude、longitude、source、queried_at，以及可选 citycode；
+citycode 仅保留高德 POI 返回的非空 ASCII 数字字符串（保留前导零），缺失或异常为 null；
+旧记录缺字段按 null 读回，不从城市名或 adcode 推导。本步尚未启用公交查询；
 daily_plans 保留日期、按顺序排列的 activities、transport_segments、
 weather 和费用字段。地图按每天 activities 的顺序，通过 place_id
 关联 places；相邻不同地点的坐标连线标注为“地点顺序示意线”，
