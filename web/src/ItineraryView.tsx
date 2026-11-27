@@ -17,13 +17,15 @@ interface ItineraryViewProps {
   itinerary: Itinerary
   editable: boolean
   savingEdit: boolean
+  replanningRoutes?: boolean
+  onReplanRoutes?: () => void
   completingRoutes?: boolean
   onCompleteRoutes?: () => void
   onEditDay: (dayNumber: number, body: EditDayRequest) => Promise<void>
 }
 
 export default function ItineraryView({
-  itinerary, editable, savingEdit, onEditDay, completingRoutes = false, onCompleteRoutes,
+  itinerary, editable, savingEdit, onEditDay, completingRoutes = false, onCompleteRoutes, replanningRoutes = false, onReplanRoutes,
 }: ItineraryViewProps) {
   const [editingDay, setEditingDay] = useState<number | null>(null)
   const [dayIndex, setDayIndex] = useState(0)
@@ -91,8 +93,11 @@ export default function ItineraryView({
             <div className="transport">
               <h4>交通段</h4>
               {editable && onCompleteRoutes && <button type="button"
-                disabled={savingEdit || completingRoutes || editingDay !== null}
+                disabled={savingEdit || completingRoutes || replanningRoutes || editingDay !== null}
                 onClick={onCompleteRoutes}>{completingRoutes ? '补全中…' : '补全交通'}</button>}
+              {editable && onReplanRoutes && <button type="button"
+                disabled={savingEdit || completingRoutes || replanningRoutes || editingDay !== null}
+                onClick={onReplanRoutes}>{replanningRoutes ? '处理中…' : '重新规划交通'}</button>}
               <ul>
                 {selectedDay.transport_segments.map((segment, index) => (
                   <li key={index}>

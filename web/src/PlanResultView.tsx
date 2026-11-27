@@ -9,6 +9,8 @@ interface Props {
   isSaved: boolean
   saving: boolean
   savingEdit: boolean
+  replanningRoutes: boolean
+  onReplanRoutes: () => void
   completingRoutes: boolean
   onCompleteRoutes: () => void
   onSave: () => void
@@ -16,7 +18,7 @@ interface Props {
 }
 
 export default function PlanResultView({
-  plan, notice, isSaved, saving, savingEdit, onSave, onEditDay, completingRoutes, onCompleteRoutes,
+  plan, notice, isSaved, saving, savingEdit, onSave, onEditDay, completingRoutes, onCompleteRoutes, replanningRoutes, onReplanRoutes,
 }: Props) {
   const [open, setOpen] = useState(false)
   const request = plan.itinerary.request
@@ -75,6 +77,8 @@ export default function PlanResultView({
               onEditDay={onEditDay}
               completingRoutes={completingRoutes}
               onCompleteRoutes={onCompleteRoutes}
+              replanningRoutes={replanningRoutes}
+              onReplanRoutes={onReplanRoutes}
             />
             <EvidenceView evidence={plan.itinerary.web_evidence ?? ''} />
           </div>
