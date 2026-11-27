@@ -25,9 +25,28 @@ export function formatCost(cost: number | null): string {
 }
 
 export function formatSegmentDuration(segment: TransportSegment): string {
-  return segment.estimated_minutes === null
-    ? '耗时未知'
-    : `约 ${segment.estimated_minutes} 分钟`
+  const route = segment.route
+  if (route?.status === 'failed') return '该段路线不可用'
+  if (route?.status === 'ok' && route.duration_seconds !== null) {
+    const distance = route.distance_meters
+    const distanceText = distance === null ? '' : distance < 1000
+      ? ` · 约 ${distance} 米`
+      : ` · 约 ${Number((distance / 1000).toFixed(1))} 公里`
+    return `预计 ${Math.ceil(route.duration_seconds / 60)} 分钟${distanceText}`
+  }
+  return '该段路线未查询'
+}
+
+export function formatRouteDetails(segment: TransportSegment): string {
+  const route = segment.route
+  if (!route || route.status !== 'ok') return ''
+  const source = route.source === 'amap' ? '高德' : route.source
+  const date = new Date(route.queried_at)
+  const timestamp = Number.isNaN(date.getTime()) ? '未知' : new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(date)
+  return `来源：${source}；查询时间：${timestamp}（北京时间）`
 }
 
 // 总费用为 null 时，无法判断是否符合预算。
@@ -43,4 +62,9 @@ export function budgetStatus(itinerary: Itinerary): string {
 
 export function describeDay(day: DailyPlan): string {
   return `第 ${day.day_number} 天 · ${day.plan_date}`
+}
+
+
+export function formatTransportMode(mode: string): string {
+  return ['打车', '出租车', 'taxi'].includes(mode.trim().toLowerCase()) ? '驾车' : mode
 }

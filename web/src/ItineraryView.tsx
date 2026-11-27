@@ -5,7 +5,9 @@ import type { Itinerary } from './types'
 import {
   describeDay,
   formatCost,
+  formatTransportMode,
   formatSegmentDuration,
+  formatRouteDetails,
   formatTimeRange,
   formatWeather,
   placeNameById,
@@ -15,11 +17,15 @@ interface ItineraryViewProps {
   itinerary: Itinerary
   editable: boolean
   savingEdit: boolean
+  replanningRoutes?: boolean
+  onReplanRoutes?: () => void
+  completingRoutes?: boolean
+  onCompleteRoutes?: () => void
   onEditDay: (dayNumber: number, body: EditDayRequest) => Promise<void>
 }
 
 export default function ItineraryView({
-  itinerary, editable, savingEdit, onEditDay,
+  itinerary, editable, savingEdit, onEditDay, completingRoutes = false, onCompleteRoutes, replanningRoutes = false, onReplanRoutes,
 }: ItineraryViewProps) {
   const [editingDay, setEditingDay] = useState<number | null>(null)
   const [dayIndex, setDayIndex] = useState(0)
@@ -86,14 +92,22 @@ export default function ItineraryView({
           {selectedDay.transport_segments.length > 0 && (
             <div className="transport">
               <h4>交通段</h4>
+              {editable && onCompleteRoutes && <button type="button"
+                disabled={savingEdit || completingRoutes || replanningRoutes || editingDay !== null}
+                onClick={onCompleteRoutes}>{completingRoutes ? '补全中…' : '补全交通'}</button>}
+              {editable && onReplanRoutes && <button type="button"
+                disabled={savingEdit || completingRoutes || replanningRoutes || editingDay !== null}
+                onClick={onReplanRoutes}>{replanningRoutes ? '处理中…' : '重新规划交通'}</button>}
               <ul>
                 {selectedDay.transport_segments.map((segment, index) => (
                   <li key={index}>
                     {placeNameById(places, segment.from_place_id)} → {placeNameById(places, segment.to_place_id)}
-                    ：{segment.mode}，{formatSegmentDuration(segment)}
+                    ：{formatTransportMode(segment.mode)}，{formatSegmentDuration(segment)}
+                    {formatRouteDetails(segment) && <div className="muted">{formatRouteDetails(segment)}</div>}
                   </li>
                 ))}
               </ul>
+              <p className="muted">路线为查询快照。</p>
             </div>
           )}
 

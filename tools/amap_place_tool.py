@@ -77,6 +77,9 @@ def search_amap_places(
 
         address_value = poi.get("address")
         address = address_value.strip() if isinstance(address_value, str) else ""
+        citycode = poi.get("citycode")
+        if not isinstance(citycode, str) or not citycode.isascii() or not citycode.isdecimal():
+            citycode = None
 
         try:
             place = Place(
@@ -87,6 +90,7 @@ def search_amap_places(
                 longitude=longitude,
                 source="amap",
                 queried_at=queried_at,
+                citycode=citycode,
             )
         except ValueError:
             continue
@@ -94,3 +98,46 @@ def search_amap_places(
         places.append(place)
 
     return places
+
+
+AMAP_PLACE_DETAIL_URL = "https://restapi.amap.com/v3/place/detail"
+
+
+def query_amap_citycode(place_id: str, *, api_key: str | None = None) -> str | None:
+    """按单个POI ID查城市编码；无结果/无有效编码为None，故障抛脱敏异常。
+
+    不查询路线、不保存或替换地点，不从名称、坐标、adcode推导。
+    """
+    if not isinstance(place_id, str) or not place_id.strip():
+        raise ValueError("地点ID不能为空")
+    place_id = place_id.strip()
+    if not place_id.isascii() or not place_id.isalnum():
+        raise ValueError("地点ID必须为单个ASCII字母数字标识")
+    key = api_key or os.getenv("AMAP_API_KEY")
+    if not key:
+        raise ValueError("未配置 AMAP_API_KEY")
+    try:
+        response = requests.get(AMAP_PLACE_DETAIL_URL,
+                                params={"key": key, "id": place_id, "output": "JSON"},
+                                timeout=(5, 10))
+        response.raise_for_status()
+        data = response.json()
+    except requests.Timeout:
+        raise RuntimeError("高德地点详情请求超时") from None
+    except (requests.RequestException, ValueError):
+        raise RuntimeError("高德地点详情请求或响应解析失败") from None
+    if not isinstance(data, dict):
+        raise RuntimeError("高德地点详情响应格式无效")
+    if data.get("status") != "1":
+        raise RuntimeError("高德地点详情服务拒绝请求")
+    pois = data.get("pois")
+    if not isinstance(pois, list):
+        raise RuntimeError("高德地点详情响应缺少pois列表")
+    if not pois:
+        return None
+    if len(pois) != 1 or not isinstance(pois[0], dict) or pois[0].get("id") != place_id:
+        raise RuntimeError("高德地点详情响应ID不匹配")
+    citycode = pois[0].get("citycode")
+    if isinstance(citycode, str) and citycode.isascii() and citycode.isdecimal():
+        return citycode
+    return None

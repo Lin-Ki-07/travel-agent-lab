@@ -238,3 +238,22 @@ export function putPreferences(
     body: JSON.stringify({ preferences }),
   })
 }
+
+
+export function completePlanRoutes(planId: string): Promise<CreatePlanResponse> {
+  return requestJson<CreatePlanResponse>(`/api/plans/${encodeURIComponent(planId)}/routes/complete`, { method: 'POST' })
+}
+
+
+export interface CompleteCitycodesResponse extends CreatePlanResponse {
+  completed_count: number
+  missing_count: number
+}
+
+export function completePlanCitycodes(planId: string): Promise<CompleteCitycodesResponse> {
+  return requestJson<CompleteCitycodesResponse>(`/api/plans/${encodeURIComponent(planId)}/places/citycodes/complete`, { method: 'POST' })
+}
+
+export function replanPlanRoutes(planId: string): Promise<CreatePlanResponse> {
+  return requestJson<CreatePlanResponse>(`/api/plans/${encodeURIComponent(planId)}/routes/replan`, { method: 'POST' })
+}

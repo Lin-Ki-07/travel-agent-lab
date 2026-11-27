@@ -1,5 +1,79 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
+from math import isfinite
+
+
+@dataclass(frozen=True)
+class RoutePart:
+    mode: str
+    positions: list[list[float]]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.mode, str) or not self.mode.strip():
+            raise ValueError("路线分段方式不能为空")
+        if not isinstance(self.positions, list) or len(self.positions) < 2:
+            raise ValueError("路线分段至少需要两个坐标")
+        for point in self.positions:
+            if not isinstance(point, list) or len(point) != 2:
+                raise ValueError("路线坐标必须为经纬度数对")
+            if any(type(v) not in (int, float) or not isfinite(v) for v in point):
+                raise ValueError("路线坐标必须为有限数值")
+            if not -180 <= point[0] <= 180 or not -90 <= point[1] <= 90:
+                raise ValueError("路线坐标超出范围")
+
+
+@dataclass(frozen=True)
+class RouteSnapshot:
+    status: str
+    source: str
+    queried_at: datetime
+    distance_meters: int | None = None
+    duration_seconds: int | None = None
+    parts: list[RoutePart] = field(default_factory=list)
+    failure_reason: str | None = None
+    failure_kind: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.status not in ("ok", "failed"):
+            raise ValueError("路线状态必须为 ok 或 failed")
+        if not isinstance(self.source, str) or not self.source.strip():
+            raise ValueError("路线来源不能为空")
+        if not isinstance(self.queried_at, datetime) or self.queried_at.utcoffset() is None:
+            raise ValueError("路线查询时间必须包含时区")
+        if not isinstance(self.parts, list) or any(not isinstance(p, RoutePart) for p in self.parts):
+            raise ValueError("路线分段类型不合法")
+        if self.failure_kind not in (None, "no_route", "blocked", "unavailable"):
+            raise ValueError("路线失败分类不合法")
+        if self.status == "ok" and self.failure_kind is not None:
+            raise ValueError("成功路线不能有失败分类")
+        if self.status == "ok":
+            if any(type(v) is not int or v <= 0 for v in (self.distance_meters, self.duration_seconds)):
+                raise ValueError("成功路线的距离和耗时必须为正整数")
+            if not self.parts or self.failure_reason is not None:
+                raise ValueError("成功路线必须有几何且不能有失败原因")
+        elif (self.distance_meters is not None or self.duration_seconds is not None or self.parts
+              or not isinstance(self.failure_reason, str) or not self.failure_reason.strip()):
+            raise ValueError("失败路线只能保留来源、时间和失败原因")
+
+
+def parse_route_snapshot(data: dict | None) -> RouteSnapshot | None:
+    """仅用于程序可信的持久化快照；不接受模型或编辑请求作为事实来源。"""
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        raise ValueError("路线快照必须是对象")
+    try:
+        return RouteSnapshot(
+            status=data["status"], source=data["source"],
+            queried_at=datetime.fromisoformat(data["queried_at"]),
+            distance_meters=data.get("distance_meters"),
+            duration_seconds=data.get("duration_seconds"),
+            parts=[RoutePart(**part) for part in data.get("parts", [])],
+            failure_reason=data.get("failure_reason"),
+            failure_kind=data.get("failure_kind"),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("路线快照字段不合法") from exc
 
 
 @dataclass(frozen=True)
@@ -32,12 +106,18 @@ class Place:
     longitude: float
     source: str
     queried_at: datetime
+    citycode: str | None = None
 
     def __post_init__(self) -> None:
         if not self.place_id.strip():
             raise ValueError("地点 ID 不能为空")
         if not self.name.strip():
             raise ValueError("地点名称不能为空")
+        if self.citycode is not None and (
+            not isinstance(self.citycode, str)
+            or not self.citycode.isascii() or not self.citycode.isdecimal()
+        ):
+            raise ValueError("城市编码必须为非空 ASCII 数字字符串或 None")
         if not self.source.strip():
             raise ValueError("地点来源不能为空")
         if not -90 <= self.latitude <= 90:
@@ -101,8 +181,18 @@ class TransportSegment:
     to_place_id: str
     mode: str
     estimated_minutes: int | None = None
+    route: RouteSnapshot | None = None
 
     def __post_init__(self) -> None:
+        if self.mode.strip().lower() in ("打车", "出租车", "taxi"):
+            object.__setattr__(self, "mode", "驾车")
+        if self.route is not None:
+            if not isinstance(self.route, RouteSnapshot):
+                raise ValueError("路线快照类型不合法")
+            expected = ((self.route.duration_seconds + 59) // 60
+                        if self.route.status == "ok" else None)
+            if self.estimated_minutes != expected:
+                raise ValueError("预计分钟数必须与路线快照一致")
         if not self.from_place_id.strip() or not self.to_place_id.strip():
             raise ValueError("交通段起终点 ID 不能为空")
         if self.from_place_id == self.to_place_id:

@@ -9,6 +9,7 @@ export interface Place {
   longitude: number
   source: string
   queried_at: string
+  citycode?: string | null
 }
 
 export interface WeatherSnapshot {
@@ -28,11 +29,28 @@ export interface Activity {
   end_time: string
 }
 
+export interface RoutePart {
+  mode: string
+  positions: [number, number][]
+}
+
+export interface RouteSnapshot {
+  status: 'ok' | 'failed'
+  source: string
+  queried_at: string
+  distance_meters: number | null
+  duration_seconds: number | null
+  parts: RoutePart[]
+  failure_reason: string | null
+  failure_kind?: 'no_route' | 'blocked' | 'unavailable' | null
+}
+
 export interface TransportSegment {
   from_place_id: string
   to_place_id: string
   mode: string
   estimated_minutes: number | null
+  route?: RouteSnapshot | null
 }
 
 export interface DailyPlan {
@@ -73,6 +91,15 @@ export interface MapDay {
   plan_date: string
   stops: MapStop[]
   line: MapLine
+  segments?: MapSegment[]
+}
+
+export interface MapSegment {
+  from_order: number
+  to_order: number
+  kind: 'route_snapshot' | 'place_order_schematic'
+  parts: RoutePart[]
+  fallback_positions: [number, number][]
 }
 
 export interface Itinerary {

@@ -10,8 +10,7 @@ export interface MarkerSpec {
 
 export interface DayOverlaySpec {
   markers: MarkerSpec[]
-  // 示意线坐标，顺序与后端 line.positions 一致；[经度, 纬度]
-  path: [number, number][]
+  lines: { path: [number, number][]; color: string; dashed: boolean }[]
   label: string
 }
 
@@ -35,9 +34,29 @@ export function buildOverlaySpec(day: MapDay): DayOverlaySpec {
     .filter((stop) => isValidPosition(stop.position))
     .map((stop) => ({ order: stop.order, placeId: stop.place_id, name: stop.name, position: stop.position }))
 
-  const path = day.line.positions.filter(isValidPosition)
-
-  return { markers, path, label: day.line.label }
+  const lines: DayOverlaySpec['lines'] = []
+  const modes = new Set<string>()
+  const validPath = (points: unknown): points is [number, number][] =>
+    Array.isArray(points) && points.length >= 2 && points.every(isValidPosition)
+  if (day.segments !== undefined) {
+    for (const segment of day.segments) {
+      const usable = segment.kind === 'route_snapshot' && Array.isArray(segment.parts) &&
+        segment.parts.length > 0 && segment.parts.every((part) =>
+          ['walking', 'driving', 'transit'].includes(part.mode) && validPath(part.positions))
+      if (!usable) continue
+      for (const part of segment.parts) {
+        const style = part.mode === 'walking' ? { color: '#238636', name: '绿色：步行' }
+          : part.mode === 'driving' ? { color: '#2a71d3', name: '蓝色：驾车' }
+            : { color: '#8957b5', name: '紫色：公交' }
+        lines.push({ path: part.positions, color: style.color, dashed: false })
+        modes.add(style.name)
+      }
+    }
+  }
+  const label = lines.length === 0 ? '' : [
+    ...modes, modes.size > 0 ? '实线为路线快照' : '',
+  ].filter(Boolean).join('；')
+  return { markers, lines, label }
 }
 
 // 选中的日期索引，越界时回退到第一天；没有任何天时返回 0。

@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
+import { runRouteReplan } from './routeReplan'
 import {
   createPlan,
+  completePlanRoutes,
+  completePlanCitycodes,
+  replanPlanRoutes,
   createEditDraft,
   confirmEditDraft,
   deletePlan,
@@ -104,6 +108,10 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(chats[0].id)
   const [saving, setSaving] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
+  const [completingRoutes, setCompletingRoutes] = useState(false)
+  const [replanningRoutes, setReplanningRoutes] = useState(false)
+  const routeOperation = useRef(false)
+  const selectionRead = useRef(0)
   const [notice, setNotice] = useState<Notice>(null)
   const [leftWidth, setLeftWidth] = useState(240)
   const [rightWidth, setRightWidth] = useState(420)
@@ -191,6 +199,7 @@ export default function App() {
   }
 
   function handleNewChat() {
+    selectionRead.current++
     setNotice(null)
     const chat = createChat()
     setChats((prev) => [chat, ...prev])
@@ -203,14 +212,28 @@ export default function App() {
       : chat))
   }
 
-  function handleSelect(planId: string) {
+  async function handleSelect(chatId: string) {
+    const read = ++selectionRead.current
     setNotice(null)
-    setSelectedId(planId)
+    setSelectedId(chatId)
+    const chat = chats.find((item) => item.id === chatId)
+    const planId = chat?.plan?.plan_id
+    if (!planId || !savedIds.has(planId) || savingEdit || routeOperation.current) return
+    try {
+      const result = await getPlan(planId)
+      // 更新发起读取的聊天，不因异步返回切换用户当前选择。
+      if (read === selectionRead.current) updateChat(chatId, { plan: result })
+    } catch {
+      if (read === selectionRead.current) {
+        setNotice({ kind: 'error', text: '行程刷新失败，当前显示已有快照，请稍后重新选择。' })
+      }
+    }
   }
 
   async function handleOpenSaved(planId: string) {
     if (openingPlanId !== null) return
 
+    selectionRead.current++
     setOpeningPlanId(planId)
     setNotice(null)
     try {
@@ -489,8 +512,55 @@ export default function App() {
     }
   }
 
+  async function handleCompleteRoutes() {
+    if (!selected || !isSaved || routeOperation.current || completingRoutes || replanningRoutes || savingEdit) return
+    routeOperation.current = true
+    const chatId = currentChat.id
+    setCompletingRoutes(true)
+    setNotice(null)
+    try {
+      const updated = await completePlanRoutes(selected.plan_id)
+      updateChat(chatId, { plan: updated })
+      setNotice({ kind: 'success', text: '交通补全已完成。' })
+    } catch (error) {
+      setNotice({ kind: 'error', text: errorText(error, '交通补全失败，请重新打开行程。') })
+    } finally {
+      routeOperation.current = false
+      setCompletingRoutes(false)
+    }
+  }
+
+  async function handleReplanRoutes() {
+    if (!selected || !isSaved || routeOperation.current || completingRoutes || replanningRoutes || savingEdit) return
+    const chatId = currentChat.id
+    let codesSaved = false
+    routeOperation.current = true
+    setReplanningRoutes(true)
+    setNotice(null)
+    try {
+      const outcome = await runRouteReplan(selected.plan_id,
+        () => window.confirm('将重新查询整个行程的交通路线，已有路线也会更新。继续？'),
+        completePlanCitycodes, replanPlanRoutes, (plan) => {
+          codesSaved = true
+          updateChat(chatId, { plan })
+        })
+      if (outcome === 'missing') {
+        setNotice({ kind: 'error', text: '部分地点缺少城市编码，暂未重新规划交通。' })
+      } else if (outcome === 'done') {
+        setNotice({ kind: 'success', text: '交通重新规划已完成。' })
+      }
+    } catch (error) {
+      setNotice({ kind: 'error', text: codesSaved
+        ? '地点资料已更新，交通重新规划失败，请重新打开行程。'
+        : errorText(error, '地点资料补齐失败，暂未重新规划交通。') })
+    } finally {
+      routeOperation.current = false
+      setReplanningRoutes(false)
+    }
+  }
+
   async function handleEditDay(dayNumber: number, body: EditDayRequest) {
-    if (!selected || !isSaved || savingEdit) return
+    if (!selected || !isSaved || savingEdit || completingRoutes || replanningRoutes || routeOperation.current) return
 
     setSavingEdit(true)
     setNotice(null)
@@ -594,7 +664,11 @@ export default function App() {
                 notice={notice}
                 isSaved={isSaved}
                 saving={saving}
-                savingEdit={savingEdit}
+                savingEdit={savingEdit || completingRoutes || replanningRoutes}
+                completingRoutes={completingRoutes}
+                onCompleteRoutes={handleCompleteRoutes}
+                replanningRoutes={replanningRoutes}
+                onReplanRoutes={handleReplanRoutes}
                 onSave={handleSave}
                 onEditDay={handleEditDay}
               />
@@ -637,7 +711,11 @@ export default function App() {
               notice={notice}
               isSaved={isSaved}
               saving={saving}
-              savingEdit={savingEdit}
+              savingEdit={savingEdit || completingRoutes || replanningRoutes}
+                completingRoutes={completingRoutes}
+                onCompleteRoutes={handleCompleteRoutes}
+                replanningRoutes={replanningRoutes}
+                onReplanRoutes={handleReplanRoutes}
               onSave={handleSave}
               onEditDay={handleEditDay}
             />

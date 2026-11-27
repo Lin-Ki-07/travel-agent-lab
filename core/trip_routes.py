@@ -1,0 +1,146 @@
+"""由确定性后端流程补充路线事实，不调用模型。"""
+
+from dataclasses import replace
+from math import radians, sin, cos, asin, sqrt
+
+from core.itinerary_validator import validate_itinerary
+from core.trip_models import Itinerary
+from tools.amap_route_tool import query_amap_route
+
+
+# 仅匹配明确方式，不根据描述猜测出行方式。
+MODE_ALIASES = {
+    "步行": "walking", "walking": "walking",
+    "驾车": "driving", "自驾": "driving", "driving": "driving",
+    # 打车复用驾车道路几何与行驶耗时，不包含接驾时间或车费。
+    "打车": "driving", "出租车": "driving", "taxi": "driving",
+    "公交": "transit", "公交车": "transit", "公共交通": "transit", "地铁": "transit",
+    "bus": "transit", "subway": "transit", "metro": "transit", "transit": "transit",
+}
+
+
+def _straight_distance(origin, destination):
+    lat1, lat2 = radians(origin.latitude), radians(destination.latitude)
+    dlat = lat2 - lat1
+    dlng = radians(destination.longitude - origin.longitude)
+    value = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlng / 2) ** 2
+    return 6371000 * 2 * asin(sqrt(min(1, max(0, value))))
+
+
+MODE_LABELS = {"walking": "步行", "transit": "公共交通", "driving": "驾车"}
+
+
+def _preferred_mode(preferences):
+    """只接受完整方式词；否定、复合及冲突表达不猜测。"""
+    modes = {MODE_ALIASES[item.strip().lower()] for item in preferences
+             if item.strip().lower() in MODE_ALIASES}
+    return next(iter(modes)) if len(modes) == 1 else None
+
+
+def _query_segment_route(segment, places, plan_date, preferences):
+    mode = _preferred_mode(preferences)
+    origin, destination = places[segment.from_place_id], places[segment.to_place_id]
+    if mode in ("walking", "driving"):
+        return query_amap_route(origin, destination, mode), MODE_LABELS[mode]
+    # 模型 mode 不是用户偏好；无明确偏好时统一执行距离策略。
+    actual_mode = "公共交通"
+    if _straight_distance(origin, destination) <= 800:
+        walking = query_amap_route(origin, destination, "walking")
+        if walking.status == "ok":
+            if walking.distance_meters <= 1200 and walking.duration_seconds <= 1200:
+                return walking, "步行"
+        elif walking.failure_kind != "no_route":
+            return walking, actual_mode
+    if origin.citycode is not None and destination.citycode is not None:
+        transit = query_amap_route(origin, destination, "transit",
+                                   origin_citycode=origin.citycode,
+                                   destination_citycode=destination.citycode,
+                                   departure_date=plan_date)
+        if transit.status == "ok" or transit.failure_kind != "no_route":
+            return transit, actual_mode
+    # 缺城市编码或明确无可用方案时才尝试驾车；未知/权限/配额/参数故障停止。
+    driving = query_amap_route(origin, destination, "driving")
+    return driving, "驾车" if driving.status == "ok" else actual_mode
+
+
+def enrich_trip_routes(itinerary: Itinerary) -> Itinerary:
+    """重新查询所有交通段（包括成功快照）；供生成及显式重新规划共用。"""
+    validate_itinerary(itinerary)
+    places = {place.place_id: place for place in itinerary.places}
+    days = []
+    for day in itinerary.daily_plans:
+        segments = []
+        for segment in day.transport_segments:
+            route, actual_mode = _query_segment_route(segment, places, day.plan_date, itinerary.request.preferences)
+            minutes = ((route.duration_seconds + 59) // 60 if route.status == "ok" else None)
+            segments.append(replace(segment, mode=actual_mode, route=route, estimated_minutes=minutes))
+        days.append(replace(day, transport_segments=segments))
+    return validate_itinerary(replace(itinerary, daily_plans=days))
+
+
+def refresh_edited_day_routes(
+    original: Itinerary, edited: Itinerary, day_number: int,
+) -> Itinerary:
+    """只更新编辑日；快照只从旧行程复用，不信任编辑结果携带的路线事实。
+
+    调用者负责先校验编辑，再在保存入口调用本函数；草案生成不得调用。
+    复用的是既有查询快照，不表示重新查询或保证当前交通状况。
+    """
+    validate_itinerary(original)
+    validate_itinerary(edited)
+    if not 1 <= day_number <= min(len(original.daily_plans), len(edited.daily_plans)):
+        raise ValueError("行程日序号不存在")
+    old_day = original.daily_plans[day_number - 1]
+    new_day = edited.daily_plans[day_number - 1]
+    if original.request != edited.request or original.places != edited.places:
+        raise ValueError("单日路线更新不能修改旅行需求或地点资料")
+    if old_day.plan_date != new_day.plan_date:
+        raise ValueError("单日路线更新不能修改行程日期")
+
+    def identity(segment):
+        text = segment.mode.strip().lower()
+        # 未知方式不能全部归为 None，否则不同未知方式会错误匹配。
+        mode = MODE_ALIASES.get(text, text)
+        return segment.from_place_id, segment.to_place_id, mode
+
+    prior = {identity(segment): segment for segment in old_day.transport_segments}
+    segments = []
+    pending = []
+    for index, segment in enumerate(new_day.transport_segments):
+        previous = prior.get(identity(segment))
+        if previous is not None and previous.route is not None:
+            segments.append(replace(segment, route=previous.route,
+                                    estimated_minutes=previous.estimated_minutes))
+        else:
+            segments.append(replace(segment, route=None, estimated_minutes=None))
+            pending.append(index)
+
+    # 复用新行程查询规则，仅查询待更新段。
+    if pending:
+        places = {place.place_id: place for place in edited.places}
+        for index in pending:
+            segment = segments[index]
+            route, actual_mode = _query_segment_route(segment, places, new_day.plan_date, edited.request.preferences)
+            minutes = ((route.duration_seconds + 59) // 60 if route.status == "ok" else None)
+            segments[index] = replace(segment, mode=actual_mode, route=route, estimated_minutes=minutes)
+    days = list(edited.daily_plans)
+    days[day_number - 1] = replace(new_day, transport_segments=segments)
+    return validate_itinerary(replace(edited, daily_plans=days))
+
+
+def complete_missing_routes(itinerary: Itinerary) -> Itinerary:
+    """仅显式补全失败/缺失快照，不刷新成功段或地点资料。"""
+    validate_itinerary(itinerary)
+    places = {p.place_id: p for p in itinerary.places}
+    days = []
+    for day in itinerary.daily_plans:
+        segments = []
+        for segment in day.transport_segments:
+            if segment.route is not None and segment.route.status == "ok":
+                segments.append(segment)
+                continue
+            route, mode = _query_segment_route(segment, places, day.plan_date, itinerary.request.preferences)
+            minutes = (route.duration_seconds + 59) // 60 if route.status == "ok" else None
+            segments.append(replace(segment, mode=mode, route=route, estimated_minutes=minutes))
+        days.append(replace(day, transport_segments=segments))
+    return validate_itinerary(replace(itinerary, daily_plans=days))

@@ -5,7 +5,7 @@ import type { MapDay, Place } from './types'
 import type { ActivityTarget } from './editIntent'
 
 interface MapPanelProps {
-  // 没有行程时传入空数组：地图仍显示（全国视野），但不绘制标记和示意线。
+  // 没有行程时传入空数组：地图仍显示（全国视野），但不绘制标记和路线。
   days: MapDay[]
   preview?: { target: ActivityTarget; candidates: Place[]; selectedId?: string }
   onSelectCandidate?: (placeId: string) => void
@@ -32,6 +32,7 @@ export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelP
 
   const safeIndex = clampDayIndex(dayIndex, days.length)
   const currentDay = days[safeIndex] as MapDay | undefined
+  const lineLabel = currentDay ? buildOverlaySpec(currentDay).label : ''
 
   // 初始化地图（只做一次）。即使还没有行程，也先显示地图。
   useEffect(() => {
@@ -120,18 +121,18 @@ export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelP
       })
     }
 
-    if (spec.path.length >= 2) {
+    spec.lines.forEach((line) => {
       overlays.push(
         new AMap.Polyline({
-          path: spec.path,
-          strokeColor: '#2a71d3',
+          path: line.path,
+          strokeColor: line.color,
           strokeWeight: 4,
           strokeOpacity: 0.8,
-          strokeStyle: 'dashed',
+          strokeStyle: line.dashed ? 'dashed' : 'solid',
           lineJoin: 'round',
         }),
       )
-    }
+    })
 
     if (overlays.length > 0) {
       map.add(overlays)
@@ -178,11 +179,11 @@ export default function MapPanel({ days, preview, onSelectCandidate }: MapPanelP
       </div>
 
       {days.length === 0 ? (
-        <p className="muted">选择或生成一个行程后，这里按日期显示地点与示意线。</p>
+        <p className="muted">选择或生成一个行程后，这里按日期显示地点与可用路线。</p>
       ) : (
         currentDay && (
           <>
-            <p className="line-note">{currentDay.line.label}</p>
+            {lineLabel && <p className="line-note">{lineLabel}</p>}
             <ol className="stop-list">
               {currentDay.stops.map((stop) => (
                 <li key={`${stop.order}-${stop.place_id}`}>

@@ -15,11 +15,14 @@ from core.edit_draft_service import confirm_edit_draft, generate_edit_draft
 from core.config import LLMConfig
 from core.exceptions import LLMError
 from core.trip_edit import edit_day
+from core.trip_place_completion import complete_endpoint_citycodes
+from core.trip_routes import enrich_trip_routes, refresh_edited_day_routes, complete_missing_routes
 from core.llm_client import OpenAICompatibleClient
 from core.trip_models import Itinerary
 from core.trip_service import plan_trip
 from core.trip_parser import parse_trip_text
 from core.trip_store import (
+    itinerary_fingerprint, update_itinerary_if_unchanged,
     delete_itinerary, list_saved_plans, load_itinerary, load_preferences, save_itinerary,
     save_preferences, update_itinerary,
 )
@@ -208,6 +211,7 @@ def update_plan_day(plan_id: str, day_number: int, raw: dict) -> dict:
 
     try:
         edited = edit_day(itinerary, day_number, raw)
+        edited = refresh_edited_day_routes(itinerary, edited, day_number)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -219,3 +223,48 @@ def update_plan_day(plan_id: str, day_number: int, raw: dict) -> dict:
         "itinerary": jsonable_encoder(asdict(edited)),
         "map_days": build_map_days(edited),
     }
+
+
+@app.post("/api/plans/{plan_id}/routes/complete")
+def complete_plan_routes(plan_id: str) -> dict:
+    itinerary = load_itinerary(plan_id)
+    if itinerary is None:
+        raise HTTPException(status_code=404, detail="已保存行程不存在")
+    fingerprint = itinerary_fingerprint(itinerary)
+    updated = complete_missing_routes(itinerary)
+    if not update_itinerary_if_unchanged(plan_id, updated, fingerprint):
+        raise HTTPException(status_code=409, detail="行程已变化，请重新打开后补全交通")
+    return {"plan_id": plan_id, "itinerary": jsonable_encoder(asdict(updated)),
+            "map_days": build_map_days(updated)}
+
+
+@app.post("/api/plans/{plan_id}/routes/replan")
+def replan_plan_routes(plan_id: str) -> dict:
+    """显式重新查询已保存行程的全部交通段，不调用模型或补查地点。"""
+    itinerary = load_itinerary(plan_id)
+    if itinerary is None:
+        raise HTTPException(status_code=404, detail="已保存行程不存在")
+    fingerprint = itinerary_fingerprint(itinerary)
+    updated = enrich_trip_routes(itinerary)
+    if not update_itinerary_if_unchanged(plan_id, updated, fingerprint):
+        raise HTTPException(status_code=409, detail="行程已变化，请重新打开后重新规划交通")
+    return {"plan_id": plan_id, "itinerary": jsonable_encoder(asdict(updated)),
+            "map_days": build_map_days(updated)}
+
+
+@app.post("/api/plans/{plan_id}/places/citycodes/complete")
+def complete_plan_citycodes(plan_id: str) -> dict:
+    """只补齐已保存行程交通端点的缺失编码，不重新查询路线。"""
+    itinerary = load_itinerary(plan_id)
+    if itinerary is None:
+        raise HTTPException(status_code=404, detail="已保存行程不存在")
+    fingerprint = itinerary_fingerprint(itinerary)
+    try:
+        updated, completed, missing = complete_endpoint_citycodes(itinerary)
+    except (ValueError, RuntimeError):
+        raise HTTPException(status_code=502, detail="地点城市编码补齐失败，未保存本次结果") from None
+    if not update_itinerary_if_unchanged(plan_id, updated, fingerprint):
+        raise HTTPException(status_code=409, detail="行程已变化，请重新打开后补齐城市编码")
+    return {"plan_id": plan_id, "itinerary": jsonable_encoder(asdict(updated)),
+            "map_days": build_map_days(updated),
+            "completed_count": completed, "missing_count": missing}

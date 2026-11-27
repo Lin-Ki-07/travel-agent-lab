@@ -18,10 +18,24 @@ def get_trip_weather(city: str, start_date: date, days: int) -> list[WeatherSnap
             timeout=(5, 10),
         )
         response.raise_for_status()
+    except requests.Timeout as exc:
+        raise RuntimeError("天气服务请求超时") from exc
+    except requests.ConnectionError as exc:
+        raise RuntimeError("无法连接天气服务") from exc
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else response.status_code
+        raise RuntimeError(f"天气服务返回 HTTP {status}") from exc
+    except requests.RequestException as exc:
+        raise RuntimeError("天气服务请求失败") from exc
+
+    try:
         data = response.json()
-    except (requests.RequestException, ValueError) as exc:
-        raise RuntimeError("天气请求或响应解析失败") from exc
-    
+    except ValueError as exc:
+        raise RuntimeError("天气响应不是有效 JSON") from exc
+
+    if not isinstance(data, dict):
+        raise RuntimeError("天气响应格式不合法：应为对象")
+
     forecasts = data.get("weather")
     if not isinstance(forecasts, list):
         raise RuntimeError("天气响应缺少逐日预报列表")
@@ -75,7 +89,7 @@ def get_trip_weather(city: str, start_date: date, days: int) -> list[WeatherSnap
                     queried_at=queried_at,
                 )
             )
-        except (KeyError, IndexError, TypeError, ValueError) as exc:
+        except (KeyError, IndexError, TypeError, ValueError, AttributeError) as exc:
             raise RuntimeError(
                 f"{plan_date.isoformat()} 的天气预报字段不完整"
             ) from exc
