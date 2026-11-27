@@ -304,3 +304,12 @@ RouteSnapshot末尾新增可选failure_kind：no_route表示明确无可用方�
 官方文档核对来源：https://lbs.amap.com/api/webservice/guide/api/search 的ID查询章节。当前文档明确使用单个id，结果结构引用关键词搜索；并提示无法获取POI详情时需要联系商务申请高级权限。本次仅读取公开文档，未调用真实地点详情服务，账号权限及返回citycode仍未实测。
 
 新增5项含子案例的离线测试，110项后端测试及git diff --check通过。测试禁用dotenv并阻止requests/httpx真实HTTP。函数尚无业务调用方，不保存、不改变地点/路线、不新增API/UI，不修改Agent或业务库，未重启服务。旧编码补齐编排及条件保存入口仍需后续审核，v0.8.0未完成。docs保持忽略，追加后比较实际文本。
+
+
+### POST /api/plans/{plan_id}/places/citycodes/complete
+
+无请求体，仅处理指定已保存行程。收集全部交通段端点，按places顺序对来源严格为amap、citycode为null的端点POI ID去重，每个ID最多调用一次详情适配器，不重试。已有编码、未被交通引用的地点及非amap地点不查询。只补写有效citycode，保留名称、地址、坐标、原queried_at及全部活动和路线快照，不调用模型或交通查询，不自动重新规划。
+
+无结果或无有效编码保留缺失并继续；服务拒绝、超时、损坏响应、ID不匹配、无效ID或缺Key立即停止，返回502，整次不保存，已发生查询无法撤销。按查询前指纹条件保存，并发修改或删除返回409；未知或未保存ID返回404且不查询。
+
+成功返回plan_id、itinerary、map_days，以及completed_count（本次成功补齐的唯一ID数）、missing_count（全部交通端点仍缺编码的唯一ID数，包含非amap来源）。无待查端点返回计数0且不发外部请求，仍核对指纹保存。保留原queried_at表示原地点快照时间，不表示本次编码查询时间。本接口尚无UI入口，详情权限和真实响应仍未验收。
