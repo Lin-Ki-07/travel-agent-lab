@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
   createPlan,
+  completePlanRoutes,
   createEditDraft,
   confirmEditDraft,
   deletePlan,
@@ -104,6 +105,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(chats[0].id)
   const [saving, setSaving] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
+  const [completingRoutes, setCompletingRoutes] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [leftWidth, setLeftWidth] = useState(240)
   const [rightWidth, setRightWidth] = useState(420)
@@ -489,8 +491,24 @@ export default function App() {
     }
   }
 
+  async function handleCompleteRoutes() {
+    if (!selected || !isSaved || completingRoutes || savingEdit) return
+    const chatId = currentChat.id
+    setCompletingRoutes(true)
+    setNotice(null)
+    try {
+      const updated = await completePlanRoutes(selected.plan_id)
+      updateChat(chatId, { plan: updated })
+      setNotice({ kind: 'success', text: '交通补全已完成。' })
+    } catch (error) {
+      setNotice({ kind: 'error', text: errorText(error, '交通补全失败，请重新打开行程。') })
+    } finally {
+      setCompletingRoutes(false)
+    }
+  }
+
   async function handleEditDay(dayNumber: number, body: EditDayRequest) {
-    if (!selected || !isSaved || savingEdit) return
+    if (!selected || !isSaved || savingEdit || completingRoutes) return
 
     setSavingEdit(true)
     setNotice(null)
@@ -594,7 +612,9 @@ export default function App() {
                 notice={notice}
                 isSaved={isSaved}
                 saving={saving}
-                savingEdit={savingEdit}
+                savingEdit={savingEdit || completingRoutes}
+                completingRoutes={completingRoutes}
+                onCompleteRoutes={handleCompleteRoutes}
                 onSave={handleSave}
                 onEditDay={handleEditDay}
               />
@@ -637,7 +657,9 @@ export default function App() {
               notice={notice}
               isSaved={isSaved}
               saving={saving}
-              savingEdit={savingEdit}
+              savingEdit={savingEdit || completingRoutes}
+                completingRoutes={completingRoutes}
+                onCompleteRoutes={handleCompleteRoutes}
               onSave={handleSave}
               onEditDay={handleEditDay}
             />

@@ -15,12 +15,13 @@ from core.edit_draft_service import confirm_edit_draft, generate_edit_draft
 from core.config import LLMConfig
 from core.exceptions import LLMError
 from core.trip_edit import edit_day
-from core.trip_routes import refresh_edited_day_routes
+from core.trip_routes import refresh_edited_day_routes, complete_missing_routes
 from core.llm_client import OpenAICompatibleClient
 from core.trip_models import Itinerary
 from core.trip_service import plan_trip
 from core.trip_parser import parse_trip_text
 from core.trip_store import (
+    itinerary_fingerprint, update_itinerary_if_unchanged,
     delete_itinerary, list_saved_plans, load_itinerary, load_preferences, save_itinerary,
     save_preferences, update_itinerary,
 )
@@ -221,3 +222,16 @@ def update_plan_day(plan_id: str, day_number: int, raw: dict) -> dict:
         "itinerary": jsonable_encoder(asdict(edited)),
         "map_days": build_map_days(edited),
     }
+
+
+@app.post("/api/plans/{plan_id}/routes/complete")
+def complete_plan_routes(plan_id: str) -> dict:
+    itinerary = load_itinerary(plan_id)
+    if itinerary is None:
+        raise HTTPException(status_code=404, detail="已保存行程不存在")
+    fingerprint = itinerary_fingerprint(itinerary)
+    updated = complete_missing_routes(itinerary)
+    if not update_itinerary_if_unchanged(plan_id, updated, fingerprint):
+        raise HTTPException(status_code=409, detail="行程已变化，请重新打开后补全交通")
+    return {"plan_id": plan_id, "itinerary": jsonable_encoder(asdict(updated)),
+            "map_days": build_map_days(updated)}

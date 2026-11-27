@@ -190,7 +190,15 @@ def update_itinerary_if_unchanged(
             ).fetchone()
             if row is None:
                 return False
-            current = json.dumps(json.loads(row[0]), ensure_ascii=False, sort_keys=True)
+            data = json.loads(row[0])
+            # 与读回默认值一致，避免旧JSON缺新增可选字段导致指纹误判。
+            for place in data["places"]:
+                place.setdefault("citycode", None)
+            for day in data["daily_plans"]:
+                for segment in day["transport_segments"]:
+                    if segment.get("route") is not None:
+                        segment["route"].setdefault("failure_kind", None)
+            current = json.dumps(data, ensure_ascii=False, sort_keys=True)
             if hashlib.sha256(current.encode("utf-8")).hexdigest() != expected_fingerprint:
                 return False
             cursor = connection.execute(

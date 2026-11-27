@@ -118,3 +118,21 @@ def refresh_edited_day_routes(
     days = list(edited.daily_plans)
     days[day_number - 1] = replace(new_day, transport_segments=segments)
     return validate_itinerary(replace(edited, daily_plans=days))
+
+
+def complete_missing_routes(itinerary: Itinerary) -> Itinerary:
+    """仅显式补全失败/缺失快照，不刷新成功段或地点资料。"""
+    validate_itinerary(itinerary)
+    places = {p.place_id: p for p in itinerary.places}
+    days = []
+    for day in itinerary.daily_plans:
+        segments = []
+        for segment in day.transport_segments:
+            if segment.route is not None and segment.route.status == "ok":
+                segments.append(segment)
+                continue
+            route, mode = _query_segment_route(segment, places, day.plan_date)
+            minutes = (route.duration_seconds + 59) // 60 if route.status == "ok" else None
+            segments.append(replace(segment, mode=mode, route=route, estimated_minutes=minutes))
+        days.append(replace(day, transport_segments=segments))
+    return validate_itinerary(replace(itinerary, daily_plans=days))

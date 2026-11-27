@@ -16,11 +16,13 @@ interface ItineraryViewProps {
   itinerary: Itinerary
   editable: boolean
   savingEdit: boolean
+  completingRoutes?: boolean
+  onCompleteRoutes?: () => void
   onEditDay: (dayNumber: number, body: EditDayRequest) => Promise<void>
 }
 
 export default function ItineraryView({
-  itinerary, editable, savingEdit, onEditDay,
+  itinerary, editable, savingEdit, onEditDay, completingRoutes = false, onCompleteRoutes,
 }: ItineraryViewProps) {
   const [editingDay, setEditingDay] = useState<number | null>(null)
   const [dayIndex, setDayIndex] = useState(0)
@@ -87,6 +89,9 @@ export default function ItineraryView({
           {selectedDay.transport_segments.length > 0 && (
             <div className="transport">
               <h4>交通段</h4>
+              {editable && onCompleteRoutes && <button type="button"
+                disabled={savingEdit || completingRoutes || editingDay !== null}
+                onClick={onCompleteRoutes}>{completingRoutes ? '补全中…' : '补全交通'}</button>}
               <ul>
                 {selectedDay.transport_segments.map((segment, index) => (
                   <li key={index}>

@@ -238,3 +238,8 @@ export function putPreferences(
     body: JSON.stringify({ preferences }),
   })
 }
+
+
+export function completePlanRoutes(planId: string): Promise<CreatePlanResponse> {
+  return requestJson<CreatePlanResponse>(`/api/plans/${encodeURIComponent(planId)}/routes/complete`, { method: 'POST' })
+}
