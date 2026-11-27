@@ -63,7 +63,7 @@ def query_amap_route(
     departure_date: date | None = None,
     departure_time: time | None = None,
 ) -> RouteSnapshot:
-    """查询第一条方案。失败返回无距离、耗时和几何的快照；不重试。"""
+    """公交取响应中首个完整可用方案，道路取首条；单次请求，不重试。"""
     queried_at = datetime.now(timezone.utc)
 
     def failed(reason: str) -> RouteSnapshot:
@@ -111,12 +111,17 @@ def query_amap_route(
             raise ValueError("方案必须是列表")
         if not plans:
             return failed("高德未返回可用路线")
-        plan = plans[0]
-        return RouteSnapshot(
-            "ok", "amap", queried_at,
-            distance_meters=_positive_integer(plan["distance"]),
-            duration_seconds=_positive_integer(plan["cost"]["duration"]),
-            parts=_parts(plan, mode),
-        )
+        # 只在同一公交响应内选方案，不为损坏方案增加网络请求。
+        for plan in (plans if mode == "transit" else plans[:1]):
+            try:
+                return RouteSnapshot(
+                    "ok", "amap", queried_at,
+                    distance_meters=_positive_integer(plan["distance"]),
+                    duration_seconds=_positive_integer(plan["cost"]["duration"]),
+                    parts=_parts(plan, mode),
+                )
+            except (KeyError, TypeError, ValueError, IndexError, OverflowError, AttributeError):
+                continue
     except (KeyError, TypeError, ValueError, IndexError, OverflowError, AttributeError):
-        return failed("高德路线方案缺少有效距离、耗时或完整几何")
+        pass
+    return failed("高德路线方案缺少有效距离、耗时或完整几何")

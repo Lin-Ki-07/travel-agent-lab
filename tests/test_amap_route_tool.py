@@ -84,3 +84,43 @@ class AmapRouteTests(unittest.TestCase):
                 get.return_value.json.return_value = {"status": "1", "route": {"transits": [{
                     "distance": "10", "cost": {"duration": "5"}, "segments": [segment]}]}}
                 self.assertEqual(self.query("transit", origin_citycode="010", destination_citycode="010").status, "failed")
+
+    def test_transit_selects_first_complete_plan_without_additional_requests(self):
+        valid = {"distance": "1200", "cost": {"duration": "600"}, "segments": [{
+            "walking": {"steps": [{"polyline": self.polyline}]},
+            "bus": {"buslines": [{"polyline": "120.2,30.2;120.3,30.3"}]},
+        }]}
+        invalid = [None, {}, {**valid, "distance": "0"}, {**valid, "cost": {}},
+                   {**valid, "segments": []},
+                   {**valid, "segments": [valid["segments"][0], {}]},
+                   {**valid, "segments": [{"railway": {"id": "train"}}]},
+                   {**valid, "segments": [{"taxi": {"distance": "10"}}]},
+                   {**valid, "segments": [{"bus": {"buslines": [{"polyline": "bad"}]}}]}]
+        later = {**valid, "distance": "2400", "cost": {"duration": "900"}}
+        for bad in invalid:
+            with self.subTest(bad=bad), patch("tools.amap_route_tool.requests.get") as get:
+                get.return_value.json.return_value = {
+                    "status": "1", "route": {"transits": [bad, valid, later]}}
+                route = self.query("transit", origin_citycode="010", destination_citycode="010")
+                get.assert_called_once()
+                self.assertEqual((route.status, route.distance_meters, route.duration_seconds),
+                                 ("ok", 1200, 600))
+                self.assertEqual([p.mode for p in route.parts], ["walking", "transit"])
+                self.assertEqual(route.parts[1].positions, [[120.2, 30.2], [120.3, 30.3]])
+        with patch("tools.amap_route_tool.requests.get") as get:
+            get.return_value.json.return_value = {"status": "1", "route": {"transits": [valid, later]}}
+            route = self.query("transit", origin_citycode="010", destination_citycode="010")
+            get.assert_called_once()
+            self.assertEqual(route.distance_meters, 1200)
+
+    def test_all_transit_plans_invalid_returns_no_route_facts(self):
+        for plans in ([], [None, {}, {"distance": "10", "cost": {"duration": "5"}, "segments": []}]):
+            with self.subTest(plans=plans), patch("tools.amap_route_tool.requests.get") as get:
+                get.return_value.json.return_value = {"status": "1", "route": {"transits": plans}}
+                route = self.query("transit", origin_citycode="010", destination_citycode="010")
+                get.assert_called_once()
+                self.assertEqual(route.status, "failed")
+                self.assertTrue(route.failure_reason)
+                self.assertEqual(route.parts, [])
+                self.assertIsNone(route.distance_meters)
+                self.assertIsNone(route.duration_seconds)
