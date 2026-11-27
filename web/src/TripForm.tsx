@@ -9,6 +9,7 @@ import {
 } from './tripRequest'
 
 interface TripFormProps {
+  onGenerationChange: (state: 'loading' | 'error', error?: string) => void
   onGenerated: (result: CreatePlanResponse) => void
   defaultPreferences: string[]
   preferencesLoaded: boolean
@@ -17,7 +18,7 @@ interface TripFormProps {
 }
 
 export default function TripForm({
-  onGenerated, initialValues, defaultPreferences, preferencesLoaded,
+  onGenerated, onGenerationChange, initialValues, defaultPreferences, preferencesLoaded,
 }: TripFormProps) {
   const [values, setValues] = useState<TripFormValues>(initialValues ?? emptyTripForm)
   const [errors, setErrors] = useState<TripFormErrors>({})
@@ -38,10 +39,12 @@ export default function TripForm({
     if (Object.keys(fieldErrors).length > 0) return
 
     setLoading(true)
+    onGenerationChange('loading')
     try {
       const result = await createPlan(toRequestBody(values))
       onGenerated(result)
     } catch (error) {
+      onGenerationChange('error', error instanceof Error ? error.message : '生成行程时发生未知错误。')
       setApiError(
         error instanceof PlanApiError
           ? error

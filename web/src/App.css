@@ -1068,3 +1068,118 @@ body {
 .evidence-list p {
   margin: 4px 0;
 }
+/* Full-screen map with a persistent, retractable chat workspace. */
+.map-workspace { position: relative; height: 100dvh; overflow: hidden; background: #e7ece8; }
+.workspace-map { position: absolute; inset: 0; }
+.map-panel-background, .map-panel-background .map-canvas-wrap { height: 100%; margin: 0; }
+.map-panel-background .map-canvas { height: 100%; min-height: 0; border: 0; border-radius: 0; }
+.map-panel-background .map-overlay { right: auto; max-width: 420px; }
+.floating-workspace {
+  position: relative; z-index: 5;
+  display: flex; flex-direction: column; min-height: 0;
+  border: 1px solid #ffffffa0; border-radius: 28px;
+  background: #f7f8faf5; box-shadow: 0 20px 70px #172e4030, 0 2px 8px #172e4012;
+  overflow: hidden; transition: transform 280ms cubic-bezier(.2,.8,.2,1);
+}
+:root[data-theme='dark'] .floating-workspace { background: #1b1e24f5; border-color: #ffffff24; }
+.floating-workspace.is-collapsed { transform: translateY(calc(100% - 44px)); }
+.floating-workspace.is-dragging { transition: none; }
+.workspace-grip {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 44px;
+  width: 100%; border: 0; padding: 0; background: transparent; color: inherit;
+  cursor: ns-resize; touch-action: none; user-select: none;
+}
+.workspace-grip span { width: 64px; height: 5px; border-radius: 99px; background: #88919c70; transition: background 150ms, width 150ms; }
+.workspace-grip:hover span { width: 80px; background: #2a71d3; }
+.workspace-grip:focus-visible { outline: 2px solid #2a71d3; outline-offset: -5px; border-radius: 24px; }
+.workspace-content { flex: 1; min-height: 0; overflow: auto; }
+.workspace-content .layout { height: 100%; min-width: 486px; }
+.workspace-content .pane { min-width: 0; min-height: 0; }
+.workspace-content .pane-map { padding-top: 12px; }
+.workspace-content .map-canvas { height: 43dvh; min-height: 220px; box-sizing: border-box; }
+@media (max-width: 900px) {
+  .workspace-panels { inset: 24px 12px 12px; }
+  .floating-workspace { border-radius: 22px; }
+  .workspace-content .layout { grid-template-columns: 160px 6px minmax(320px, 1fr) !important; }
+}
+@media (prefers-reduced-motion: reduce) { .floating-workspace { transition: none; } }
+.workspace-map { z-index: 0; }
+.pane-details { border-right: 0; }
+.details-empty { margin-top: 24px; line-height: 1.8; }
+.plan-details { overflow-wrap: anywhere; }
+.plan-details .plan-toolbar { flex-wrap: wrap; }
+.plan-result-card[aria-expanded='true'] { border-color: #2a71d3; }
+.background-day-tabs { position: absolute; z-index: 2; top: 6px; left: 4vw; right: 4vw; flex-wrap: nowrap; overflow-x: auto; }
+.background-day-tabs .day-tab { flex-shrink: 0; background: #f7f8fa; color: #1c2430; }
+.background-day-tabs .day-tab.active { background: #2a71d3; color: white; }
+
+.workspace-panels {
+  position: absolute; inset: 40px 4vw 20px; z-index: 5;
+  display: grid; min-height: 0; pointer-events: none;
+}
+.workspace-panels > * { pointer-events: auto; }
+.workspace-panels > .resize-handle { z-index: 6; }
+.details-workspace { min-width: 0; }
+.details-workspace .pane-details { flex: 1; min-height: 0; }
+.details-grip { cursor: default; }
+@media (max-width: 900px) {
+  .workspace-panels { inset: 40px 12px 12px; grid-template-columns: minmax(486px, 1fr) 6px 240px !important; overflow: visible; }
+}
+/* Docked panels share one continuous surface; only outer corners are rounded. */
+.workspace-panels > .floating-workspace:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 0;
+  box-shadow: -12px 20px 40px #172e4018;
+}
+.workspace-panels > .details-workspace {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+  box-shadow: 12px 20px 40px #172e4018;
+}
+.workspace-panels > .resize-handle {
+  background: #f7f8faf5;
+  border-top: 1px solid #ffffffa0;
+  border-bottom: 1px solid #ffffffa0;
+}
+:root[data-theme='dark'] .workspace-panels > .resize-handle {
+  background: #1b1e24f5;
+  border-color: #ffffff24;
+}
+.workspace-panels.details-detached > .floating-workspace:first-child,
+.workspace-panels > .details-workspace.is-detached {
+  border-radius: 28px; border: 1px solid #ffffffa0;
+  box-shadow: 0 20px 70px #172e4030, 0 2px 8px #172e4012;
+}
+:root[data-theme='dark'] .workspace-panels.details-detached > .floating-workspace:first-child,
+:root[data-theme='dark'] .workspace-panels > .details-workspace.is-detached { border-color: #ffffff24; }
+.workspace-panels.details-detached > .resize-handle { visibility: hidden; }
+.details-workspace.is-detached { z-index: 10; box-sizing: border-box; transition: none; }
+.details-grip { cursor: grab; }
+.is-moving .details-grip { cursor: grabbing; }
+.details-dock-anchor { grid-column: 3; grid-row: 1; min-width: 0; visibility: hidden; pointer-events: none; }
+.workspace-panels > .details-workspace { grid-column: 3; grid-row: 1; }
+.details-snap-preview {
+  position: fixed; z-index: 9; pointer-events: none; box-sizing: border-box;
+  border: 2px solid #2a71d3; border-radius: 28px; background: #2a71d326;
+  box-shadow: 0 0 0 4px #2a71d31a;
+}
+/* Keep both panel handles reachable on compact windows. */
+.workspace-panels { grid-template-rows: minmax(0, 1fr); }
+.workspace-panels > .floating-workspace:first-child { min-width: 0; }
+.workspace-panels:has(> .is-collapsed) > .details-workspace {
+  border-radius: 28px; border-left: 1px solid #ffffffa0;
+}
+.workspace-panels:has(> .is-collapsed) > .resize-handle { visibility: hidden; }
+@media (max-width: 900px) {
+  .workspace-panels { grid-template-columns: minmax(0, 1fr) 6px minmax(200px, 32%) !important; }
+}
+@media (max-width: 600px) {
+  .workspace-panels { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .workspace-panels > .floating-workspace:first-child { grid-column: 1; grid-row: 1; border-radius: 22px; border: 1px solid #ffffffa0; }
+  .workspace-panels > .resize-handle { display: none; }
+  .details-dock-anchor, .workspace-panels > .details-workspace { grid-column: 1; grid-row: 2; }
+  .workspace-panels > .details-workspace { border-radius: 22px; border: 1px solid #ffffffa0; }
+  :root[data-theme='dark'] .workspace-panels > .floating-workspace { border-color: #ffffff24; }
+}

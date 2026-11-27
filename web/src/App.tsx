@@ -24,9 +24,12 @@ import {
 import ChatComposer from './ChatComposer'
 import HistoryPanel from './HistoryPanel'
 import PlanResultView from './PlanResultView'
+import PlanDetails from './PlanDetails'
 import MapPanel from './MapPanel'
 import NewChatView from './NewChatView'
 import ResizeHandle from './ResizeHandle'
+import FloatingWorkspace from './FloatingWorkspace'
+import DraggableDetails from './DraggableDetails'
 import { findReplacementTargets, type ActivityTarget } from './editIntent'
 import { prepareActivityRemoval } from './removeActivity'
 import { replacementCandidates } from './replacementCandidates'
@@ -50,6 +53,8 @@ interface Chat {
   messages: ChatMessage[]
   draft: string
   parsing: boolean
+  generation: 'idle' | 'loading' | 'error' | 'ready'
+  generationError: string
   formOpen: boolean
   prefill: TripFormValues | null
   formKey: number
@@ -64,6 +69,8 @@ function createChat(): Chat {
     messages: [],
     draft: '',
     parsing: false,
+    generation: 'idle',
+    generationError: '',
     formOpen: false,
     prefill: null,
     formKey: 0,
@@ -113,6 +120,8 @@ export default function App() {
   const routeOperation = useRef(false)
   const selectionRead = useRef(0)
   const [notice, setNotice] = useState<Notice>(null)
+  const [detailsDetached, setDetailsDetached] = useState(false)
+  const [mapDayIndex, setMapDayIndex] = useState(0)
   const [leftWidth, setLeftWidth] = useState(240)
   const [rightWidth, setRightWidth] = useState(420)
   const widthsAtDragStart = useRef({ left: 240, right: 420 })
@@ -208,7 +217,7 @@ export default function App() {
 
   function handleGenerated(chatId: string, result: CreatePlanResponse) {
     setChats((prev) => prev.map((chat) => chat.id === chatId
-      ? { ...chat, plan: result, messages: [...chat.messages, { role: 'assistant', text: '', planCard: true }] }
+      ? { ...chat, plan: result, generation: 'ready', generationError: '', formOpen: false, messages: [...chat.messages, { role: 'assistant', text: '', planCard: true }] }
       : chat))
   }
 
@@ -242,13 +251,13 @@ export default function App() {
 
       if (existing) {
         updateChat(existing.id, { plan: result })
-        setSelectedId(existing.id)
+    setSelectedId(existing.id)
       } else {
         const chat = createChat()
         chat.plan = result
         chat.title = `${result.itinerary.request.destination}旅游攻略`
         setChats((prev) => [chat, ...prev])
-        setSelectedId(chat.id)
+    setSelectedId(chat.id)
       }
       setSavedIds((prev) => new Set(prev).add(planId))
     } catch (error) {
@@ -281,7 +290,7 @@ export default function App() {
       const nextChats = remaining.length ? remaining : [createChat()]
       setChats(nextChats)
       if (removedChatIds.includes(selectedId)) {
-        setSelectedId(nextChats[0].id)
+    setSelectedId(nextChats[0].id)
       }
       if (planId) {
         setSavedPlans((prev) => prev.filter((plan) => plan.plan_id !== planId))
@@ -473,12 +482,15 @@ export default function App() {
         }])
       } else {
         appendMessages(chatId, [{ role: 'assistant', text: '信息已齐全，正在生成行程…', pending: true }])
+        updateChat(chatId, { generation: 'loading', generationError: '' })
         const plan = await createPlan(toRequestBody(merged))
         removePendingMessage(chatId)
         handleGenerated(chatId, plan)
       }
     } catch (error) {
       removePendingMessage(chatId)
+      setChats((prev) => prev.map((chat) => chat.id === chatId && chat.generation === 'loading'
+        ? { ...chat, generation: 'error', generationError: errorText(error, '请稍后重试。') } : chat))
       appendMessages(chatId, [
         {
           role: 'assistant',
@@ -585,12 +597,12 @@ export default function App() {
     setLeftWidth(clamp(widthsAtDragStart.current.left + dx, LEFT_MIN, LEFT_MAX))
   }
 
-  // 右分隔条：向左拖动增加地图栏宽度。
+  // 右分隔条：向左拖动增加行程详情栏宽度。
   function dragRight(dx: number) {
     setRightWidth(clamp(widthsAtDragStart.current.right - dx, RIGHT_MIN, RIGHT_MAX))
   }
 
-  const gridColumns = `${leftWidth}px ${HANDLE_WIDTH}px minmax(${CENTER_MIN}px, 1fr) ${HANDLE_WIDTH}px ${rightWidth}px`
+  const gridColumns = `${leftWidth}px ${HANDLE_WIDTH}px minmax(${CENTER_MIN}px, 1fr)`
   const latestChoice = [...currentChat.messages].reverse().find((message) => message.activityChoice)?.activityChoice
   const activeChoice = latestChoice?.selected === 'alternatives' ? latestChoice : undefined
   const previewCandidates = selected && activeChoice ? replacementCandidates(selected.itinerary, activeChoice.target) : []
@@ -605,7 +617,23 @@ export default function App() {
   }
 
   return (
-    <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
+    <div className="map-workspace">
+      <div className="workspace-map" aria-label="背景地图">
+        <MapPanel days={selected?.map_days ?? []} background selectedDayIndex={mapDayIndex}
+          preview={previewTarget ? { target: previewTarget, candidates: previewCandidates, selectedId: activeChoice?.candidateId } : undefined}
+          onSelectCandidate={selectPreviewCandidate} />
+      </div>
+      {selected && selected.map_days.length > 0 && (
+        <div className="background-day-tabs day-tabs" role="group" aria-label="背景地图日期">
+          {selected.map_days.map((day, index) => (
+            <button key={day.day_number} type="button" className={index === Math.min(mapDayIndex, selected.map_days.length - 1) ? 'day-tab active' : 'day-tab'}
+              aria-pressed={index === Math.min(mapDayIndex, selected.map_days.length - 1)} onClick={() => setMapDayIndex(index)}>第 {day.day_number} 天</button>
+          ))}
+        </div>
+      )}
+      <div className={`workspace-panels${detailsDetached ? ' details-detached' : ''}`} style={{ gridTemplateColumns: `minmax(486px, 1fr) ${HANDLE_WIDTH}px ${rightWidth}px` }}>
+      <FloatingWorkspace>
+      <div className="layout" style={{ gridTemplateColumns: gridColumns }}>
       <aside className="pane pane-history" aria-label="对话列表">
         <HistoryPanel
           chats={chats}
@@ -652,6 +680,7 @@ export default function App() {
                 prefill={chat.prefill}
                 formKey={chat.formKey}
                 onGenerated={(result) => handleGenerated(chat.id, result)}
+                onGenerationChange={(generation, generationError = '') => updateChat(chat.id, { generation, generationError })}
               />
             </div>
           ))}
@@ -661,16 +690,8 @@ export default function App() {
               <PlanResultView
                 key={`${selected.plan_id}-${index}`}
                 plan={selected}
-                notice={notice}
-                isSaved={isSaved}
-                saving={saving}
-                savingEdit={savingEdit || completingRoutes || replanningRoutes}
-                completingRoutes={completingRoutes}
-                onCompleteRoutes={handleCompleteRoutes}
-                replanningRoutes={replanningRoutes}
-                onReplanRoutes={handleReplanRoutes}
-                onSave={handleSave}
-                onEditDay={handleEditDay}
+                onOpen={() => document.getElementById('plan-details')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
+                active
               />
             ) : (
               <div key={index} className={`chat-bubble ${message.role}`}>
@@ -708,16 +729,8 @@ export default function App() {
             <PlanResultView
               key={selected.plan_id}
               plan={selected}
-              notice={notice}
-              isSaved={isSaved}
-              saving={saving}
-              savingEdit={savingEdit || completingRoutes || replanningRoutes}
-                completingRoutes={completingRoutes}
-                onCompleteRoutes={handleCompleteRoutes}
-                replanningRoutes={replanningRoutes}
-                onReplanRoutes={handleReplanRoutes}
-              onSave={handleSave}
-              onEditDay={handleEditDay}
+                onOpen={() => document.getElementById('plan-details')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
+                active
             />
           )}
         </div>
@@ -733,14 +746,34 @@ export default function App() {
         </div>
       </main>
 
-      <ResizeHandle label="调整地图栏宽度" onDragStart={beginDrag} onDrag={dragRight} />
+      </div>
+      </FloatingWorkspace>
 
-      <section className="pane pane-map" aria-label="地图">
-        <h2>地图</h2>
-        <MapPanel key={selected?.plan_id ?? 'empty'} days={selected?.map_days ?? []}
-          preview={previewTarget ? { target: previewTarget, candidates: previewCandidates, selectedId: activeChoice?.candidateId } : undefined}
-          onSelectCandidate={selectPreviewCandidate} />
+      <ResizeHandle label="调整行程详情栏宽度" onDragStart={beginDrag} onDrag={dragRight} />
+
+      <DraggableDetails onDetach={() => setDetailsDetached(true)} onDock={() => setDetailsDetached(false)}>
+      <section id="plan-details" className="pane pane-details" aria-label="行程详情">
+        <h2>行程详情</h2>
+        {selected ? (
+          <PlanDetails key={currentChat.id} plan={selected} notice={notice} isSaved={isSaved}
+            completingRoutes={completingRoutes} onCompleteRoutes={handleCompleteRoutes}
+            replanningRoutes={replanningRoutes} onReplanRoutes={handleReplanRoutes}
+            saving={saving} savingEdit={savingEdit || completingRoutes || replanningRoutes} onSave={handleSave} onEditDay={handleEditDay} />
+        ) : currentChat.generation === 'loading' ? (
+          <div className="banner banner-pending" role="status" aria-live="polite">
+            旅行计划正在生成中…
+            <p>正在整理地点、天气与路线，请稍候。</p>
+          </div>
+        ) : currentChat.generation === 'error' ? (
+          <div className="banner banner-error" role="alert">
+            <strong>旅行计划生成失败</strong>
+            <p>{currentChat.generationError}</p>
+            <button type="button" onClick={() => updateChat(currentChat.id, { formOpen: true })}>检查需求并重试</button>
+          </div>
+        ) : <p className="muted details-empty">生成旅行计划后，在这里查看行程详情。</p>}
       </section>
+      </DraggableDetails>
+      </div>
     </div>
   )
 }
