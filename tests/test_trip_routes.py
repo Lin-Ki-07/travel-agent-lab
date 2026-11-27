@@ -74,6 +74,45 @@ class TripRoutesTests(unittest.TestCase):
         query.assert_not_called()
         self.assertEqual(result.daily_plans[0].transport_segments, [])
 
+    def test_taxi_aliases_query_driving_once_and_preserve_requested_mode(self):
+        day = self.trip.daily_plans[0]
+        driving = replace(self.route, parts=[replace(self.route.parts[0], mode="driving")])
+        failed = RouteSnapshot("failed", "amap", self.trip.generated_at, failure_reason="超时")
+        for mode in ("打车", "出租车", " TAXI "):
+            for route in (driving, failed):
+                with self.subTest(mode=mode, status=route.status):
+                    trip = replace(self.trip, daily_plans=[replace(day, transport_segments=[
+                        replace(day.transport_segments[0], mode=mode, estimated_minutes=99)])])
+                    with patch("core.trip_routes.query_amap_route", return_value=route) as query:
+                        result = enrich_trip_routes(trip)
+                    query.assert_called_once_with(trip.places[0], trip.places[1], "driving")
+                    segment = result.daily_plans[0].transport_segments[0]
+                    self.assertEqual(segment.mode, mode)
+                    self.assertEqual(segment.route, route)
+                    self.assertEqual(segment.estimated_minutes, 2 if route.status == "ok" else None)
+                    if route.status == "failed":
+                        self.assertEqual(segment.route.parts, [])
+                        self.assertIsNone(segment.route.distance_meters)
+                        self.assertIsNone(segment.route.duration_seconds)
+
+    def test_edit_taxi_alias_reuses_success_or_failure_without_query(self):
+        day = self.trip.daily_plans[0]
+        driving = replace(self.route, parts=[replace(self.route.parts[0], mode="driving")])
+        failed = RouteSnapshot("failed", "amap", self.trip.generated_at,
+                               failure_reason="不支持的交通方式，未查询路线")
+        for route, minutes in ((driving, 2), (failed, None)):
+            with self.subTest(status=route.status):
+                original = replace(self.trip, daily_plans=[replace(day, transport_segments=[
+                    replace(day.transport_segments[0], mode="打车", route=route, estimated_minutes=minutes)])])
+                edited = replace(self.trip, daily_plans=[replace(day, transport_segments=[
+                    replace(day.transport_segments[0], mode=" TAXI ", estimated_minutes=99)])])
+                with patch("core.trip_routes.query_amap_route") as query:
+                    result = refresh_edited_day_routes(original, edited, 1)
+                query.assert_not_called()
+                segment = result.daily_plans[0].transport_segments[0]
+                self.assertEqual((segment.mode, segment.route, segment.estimated_minutes),
+                                 (" TAXI ", route, minutes))
+
     def test_edit_reuses_success_and_failure_with_mode_alias(self):
         for route, minutes in ((self.route, 2), (RouteSnapshot(
                 "failed", "amap", self.trip.generated_at, failure_reason="超时"), None)):
@@ -93,14 +132,14 @@ class TripRoutesTests(unittest.TestCase):
 
     def test_edit_queries_missing_snapshot_or_changed_mode_and_ignores_incoming_route(self):
         day = self.trip.daily_plans[0]
-        for mode in ("步行", "自驾", "公交", "火车"):
+        for mode in ("步行", "自驾", "打车", "公交", "火车"):
             with self.subTest(mode=mode):
                 incoming = replace(day, transport_segments=[replace(
                     day.transport_segments[0], mode=mode, route=self.route, estimated_minutes=2)])
                 failed = RouteSnapshot("failed", "amap", self.trip.generated_at, failure_reason="超时")
                 with patch("core.trip_routes.query_amap_route", return_value=failed) as query:
                     result = refresh_edited_day_routes(self.trip, replace(self.trip, daily_plans=[incoming]), 1)
-                self.assertEqual(query.call_count, int(mode in ("步行", "自驾")))
+                self.assertEqual(query.call_count, int(mode in ("步行", "自驾", "打车")))
                 segment = result.daily_plans[0].transport_segments[0]
                 self.assertEqual(segment.route.status, "failed")
                 self.assertIsNone(segment.estimated_minutes)

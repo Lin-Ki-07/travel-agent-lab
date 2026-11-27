@@ -12,6 +12,8 @@ from tools.amap_route_tool import query_amap_route
 MODE_ALIASES = {
     "步行": "walking", "walking": "walking",
     "驾车": "driving", "自驾": "driving", "driving": "driving",
+    # 打车复用驾车道路几何与行驶耗时，不包含接驾时间或车费。
+    "打车": "driving", "出租车": "driving", "taxi": "driving",
     "公交": "transit", "公共交通": "transit", "地铁": "transit", "transit": "transit",
 }
 
