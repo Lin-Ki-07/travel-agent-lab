@@ -64,7 +64,7 @@ def _query_segment_route(segment, places, plan_date, preferences):
 
 
 def enrich_trip_routes(itinerary: Itinerary) -> Itinerary:
-    """为新行程所有交通段补充快照；按请求偏好选择方式，查询失败不阻断行程。"""
+    """重新查询所有交通段（包括成功快照）；供生成及显式重新规划共用。"""
     validate_itinerary(itinerary)
     places = {place.place_id: place for place in itinerary.places}
     days = []

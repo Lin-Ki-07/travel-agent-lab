@@ -7,7 +7,7 @@ from fastapi import HTTPException
 import api
 from core.trip_models import RoutePart, RouteSnapshot
 from core.trip_routes import complete_missing_routes
-from core.trip_store import save_itinerary, load_itinerary, update_itinerary, update_itinerary_if_unchanged
+from core.trip_store import save_itinerary, load_itinerary, update_itinerary, update_itinerary_if_unchanged, delete_itinerary
 import test_trip_persistence_edit as fixtures
 
 
@@ -81,3 +81,75 @@ class RouteCompletionTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT itinerary_json FROM saved_plans").fetchone()[0], raw)
         from core.trip_store import itinerary_fingerprint
         self.assertTrue(update_itinerary_if_unchanged("test", restored, itinerary_fingerprint(restored), self.db))
+
+
+    def test_replan_endpoint_replaces_success_failure_and_missing_snapshots(self):
+        day = self.trip.daily_plans[0]
+        failed = RouteSnapshot("failed", "amap", self.trip.generated_at,
+                               failure_reason="超时", failure_kind="unavailable")
+        for old in (None, failed, self.route):
+            for mode, preferences, expected in (("公共交通", [], "transit"),
+                                                 ("驾车", ["自驾"], "driving"),
+                                                 ("步行", ["步行"], "walking")):
+                for success in (True, False):
+                    with self.subTest(old=old, mode=mode, success=success):
+                        trip = replace(self.trip, request=replace(self.trip.request, preferences=preferences),
+                            places=[replace(p, citycode="010") for p in self.trip.places],
+                            daily_plans=[replace(day, transport_segments=[replace(day.transport_segments[0],
+                                mode="驾车", route=old, estimated_minutes=2 if old == self.route else None)])])
+                        delete_itinerary("test", self.db)
+                        save_itinerary("test", trip, self.db)
+                        fresh = replace(self.route, duration_seconds=121,
+                            parts=[replace(self.route.parts[0], mode=expected)]) if success else failed
+                        with patch("api.load_itinerary", side_effect=lambda pid: load_itinerary(pid, self.db)), patch(
+                                "api.update_itinerary_if_unchanged", side_effect=lambda pid, value, fp:
+                                update_itinerary_if_unchanged(pid, value, fp, self.db)), patch(
+                                "core.trip_routes.query_amap_route", return_value=fresh) as query:
+                            response = api.replan_plan_routes("test")
+                        self.assertEqual(query.call_count, 1)
+                        self.assertEqual(query.call_args.args[2], expected)
+                        restored = load_itinerary("test", self.db)
+                        segment = restored.daily_plans[0].transport_segments[0]
+                        self.assertEqual(segment.mode, mode)
+                        self.assertEqual(segment.route, fresh)
+                        self.assertEqual(segment.estimated_minutes, 3 if success else None)
+                        self.assertEqual(restored.request, trip.request)
+                        self.assertEqual(restored.places, trip.places)
+                        self.assertEqual(restored.daily_plans[0].activities, day.activities)
+                        self.assertEqual(restored.web_evidence, trip.web_evidence)
+                        mapped = response["map_days"][0]["segments"][0]
+                        if success:
+                            self.assertEqual(mapped["kind"], "route_snapshot")
+                        else:
+                            self.assertEqual(segment.route.parts, [])
+                            self.assertNotEqual(mapped["kind"], "route_snapshot")
+
+    def test_replan_rejects_concurrent_edit_or_delete(self):
+        concurrent = replace(self.trip, web_evidence="并发编辑")
+        for deleted in (False, True):
+            with self.subTest(deleted=deleted):
+                delete_itinerary("test", self.db)
+                save_itinerary("test", self.trip, self.db)
+                def query_route(*args, **kwargs):
+                    if deleted:
+                        delete_itinerary("test", self.db)
+                    else:
+                        update_itinerary("test", concurrent, self.db)
+                    return self.route
+                with patch("api.load_itinerary", side_effect=lambda pid: load_itinerary(pid, self.db)), patch(
+                        "api.update_itinerary_if_unchanged", side_effect=lambda pid, value, fp:
+                        update_itinerary_if_unchanged(pid, value, fp, self.db)), patch(
+                        "core.trip_routes.query_amap_route", side_effect=query_route):
+                    with self.assertRaises(HTTPException) as caught:
+                        api.replan_plan_routes("test")
+                self.assertEqual(caught.exception.status_code, 409)
+                self.assertEqual(load_itinerary("test", self.db), None if deleted else concurrent)
+
+    def test_replan_unknown_or_unsaved_plan_does_not_query(self):
+        with patch("api.load_itinerary", return_value=None), patch.dict(
+                api.generated_plans, {"unsaved": self.trip}), patch("core.trip_routes.query_amap_route") as query:
+            for pid in ("missing", "unsaved"):
+                with self.subTest(pid=pid), self.assertRaises(HTTPException) as caught:
+                    api.replan_plan_routes(pid)
+                self.assertEqual(caught.exception.status_code, 404)
+        query.assert_not_called()
