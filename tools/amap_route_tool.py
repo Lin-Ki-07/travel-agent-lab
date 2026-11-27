@@ -31,6 +31,13 @@ def _part(mode: str, polyline: object) -> RoutePart:
     return RoutePart(mode, positions)
 
 
+def _transit_part(mode: str, polyline: object) -> RoutePart:
+    # 实际v5公交响应将点串包装为{"polyline": "..."}；只解包一层。
+    if isinstance(polyline, dict):
+        polyline = polyline.get("polyline")
+    return _part(mode, polyline)
+
+
 def _parts(plan: dict, mode: str) -> list[RoutePart]:
     if mode != "transit":
         return [_part(mode, step["polyline"]) for step in plan["steps"]]
@@ -41,12 +48,12 @@ def _parts(plan: dict, mode: str) -> list[RoutePart]:
             raise ValueError("暂不支持铁路或出租车混合方案")
         walking = segment.get("walking") or {}
         for step in walking.get("steps", []):
-            result.append(_part("walking", step["polyline"]))
+            result.append(_transit_part("walking", step["polyline"]))
         bus = segment.get("bus") or {}
         lines = bus.get("buslines") or []
         if lines:
             # 同一分段中的 buslines 为备选线路，不顺次拼接。
-            result.append(_part("transit", lines[0]["polyline"]))
+            result.append(_transit_part("transit", lines[0]["polyline"]))
         if not walking.get("steps") and not lines:
             raise ValueError("公交分段缺少可用几何")
     return result

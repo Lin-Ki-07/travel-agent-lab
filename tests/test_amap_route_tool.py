@@ -182,3 +182,57 @@ class AmapRouteTests(unittest.TestCase):
                     self.assertEqual(route.failure_kind, "unavailable")
                     self.assertEqual(route.parts, [])
                     get.assert_called_once()
+
+
+    def test_transit_nested_and_mixed_polylines_preserve_independent_parts(self):
+        from itertools import product
+        bus_points = "120.2,30.2;120.3,30.3"
+        for nested_walk, nested_bus in product((False, True), repeat=2):
+            with self.subTest(walking=nested_walk, bus=nested_bus), patch("tools.amap_route_tool.requests.get") as get:
+                walk = {"polyline": self.polyline} if nested_walk else self.polyline
+                bus = {"polyline": bus_points} if nested_bus else bus_points
+                plan = {"distance": "1200", "cost": {"duration": "600"}, "segments": [
+                    {"walking": {"steps": [{"polyline": walk}]},
+                     "bus": {"buslines": [{"polyline": bus, "type": "地铁线路"},
+                                          {"polyline": "bad-unused-alternative"}]}},
+                    {"walking": {"steps": [{"polyline": walk}]}}]}
+                get.return_value.json.return_value = {"status": "1", "route": {"transits": [plan]}}
+                result = self.query("transit", origin_citycode="010", destination_citycode="010")
+                self.assertEqual(result.status, "ok")
+                self.assertEqual([p.mode for p in result.parts], ["walking", "transit", "walking"])
+                self.assertEqual(result.parts[1].positions, [[120.2, 30.2], [120.3, 30.3]])
+                self.assertEqual(result.parts[0].positions, result.parts[2].positions)
+                get.assert_called_once()
+
+    def test_bad_nested_transit_geometry_rejects_whole_candidate(self):
+        from copy import deepcopy
+        valid = {"distance": "1200", "cost": {"duration": "600"}, "segments": [{
+            "walking": {"steps": [{"polyline": {"polyline": self.polyline}}]},
+            "bus": {"buslines": [{"polyline": {"polyline": self.polyline}}]}}]}
+        for bad in ({}, {"polyline": None}, {"polyline": []}, {"polyline": 12},
+                    {"polyline": {"polyline": self.polyline}}, {"polyline": "bad"},
+                    {"polyline": "120,30"}, {"polyline": "120,30;999,30"}):
+            for field in ("walking", "bus"):
+                broken = deepcopy(valid)
+                segment = broken["segments"][0]
+                target = segment["walking"]["steps"][0] if field == "walking" else segment["bus"]["buslines"][0]
+                target["polyline"] = bad
+                for plans, expected in (([broken], "failed"), ([broken, valid], "ok")):
+                    with self.subTest(bad=bad, field=field, expected=expected), patch("tools.amap_route_tool.requests.get") as get:
+                        get.return_value.json.return_value = {"status": "1", "route": {"transits": plans}}
+                        result = self.query("transit", origin_citycode="010", destination_citycode="010")
+                        self.assertEqual(result.status, expected)
+                        self.assertEqual(len(result.parts), 2 if expected == "ok" else 0)
+                        if expected == "failed":
+                            self.assertEqual(result.failure_kind, "unavailable")
+                        get.assert_called_once()
+
+    def test_road_polyline_contract_remains_string_only(self):
+        for mode in ("walking", "driving"):
+            with self.subTest(mode=mode), patch("tools.amap_route_tool.requests.get") as get:
+                get.return_value.json.return_value = {"status": "1", "route": {"paths": [{
+                    "distance": "120", "cost": {"duration": "61"},
+                    "steps": [{"polyline": {"polyline": self.polyline}}]}]}}
+                result = self.query(mode)
+                self.assertEqual(result.failure_kind, "unavailable")
+                self.assertEqual(result.parts, [])
