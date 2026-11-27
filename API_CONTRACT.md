@@ -295,3 +295,12 @@ RouteSnapshot末尾新增可选failure_kind：no_route表示明确无可用方�
 无请求体，仅处理指定的已保存行程。显式重新查询全部交通段，包括已有成功快照，复用生成入口enrich_trip_routes及当前request.preferences交通策略；不调用模型、不补查地点城市编码、不改变活动、日期、地点、预算和网页资料。每段沿用最多3次、非短距最多2次请求及故障停止规则。成功保存新快照与分钟数；失败以新失败快照替换旧成功几何，分钟数为null，地图保留标记、不绘制示意线。
 
 查询前记录行程指纹，查询后条件保存；期间被编辑或删除返回409，不覆盖其他结果，已经发生的查询无法撤销。未知或仅在内存未保存的ID返回404且不查询。成功返回plan_id、itinerary、map_days，结构与补全接口一致。现有routes/complete继续只补查失败/缺失段并保留成功快照；GET、打开、保存不自动重新规划。本步未增加前端入口。缺citycode仍按既有规则跳过公交，重新规划不能保证旧行程获得公共交通。
+
+
+### 8.2.3.9 按POI ID查询城市编码适配器（2026-11-27，离线验证）
+
+新增tools/amap_place_tool.py的query_amap_citycode：单个非空ASCII字母数字POI ID，调用GET https://restapi.amap.com/v3/place/detail，参数为key、id、output=JSON，固定timeout=(5,10)，单次请求不重试。仅接受唯一且ID完全匹配的POI；有效citycode为非空ASCII数字字符串，保留前导零。空pois或匹配POI缺失/无有效编码返回None，不从名称、坐标、adcode推导。ID不匹配、多结果、损坏响应、服务拒绝、HTTP/网络/超时及JSON错误抛脱敏异常，不透传原始正文、URL或Key。输入无效或缺Key不请求。
+
+官方文档核对来源：https://lbs.amap.com/api/webservice/guide/api/search 的ID查询章节。当前文档明确使用单个id，结果结构引用关键词搜索；并提示无法获取POI详情时需要联系商务申请高级权限。本次仅读取公开文档，未调用真实地点详情服务，账号权限及返回citycode仍未实测。
+
+新增5项含子案例的离线测试，110项后端测试及git diff --check通过。测试禁用dotenv并阻止requests/httpx真实HTTP。函数尚无业务调用方，不保存、不改变地点/路线、不新增API/UI，不修改Agent或业务库，未重启服务。旧编码补齐编排及条件保存入口仍需后续审核，v0.8.0未完成。docs保持忽略，追加后比较实际文本。
