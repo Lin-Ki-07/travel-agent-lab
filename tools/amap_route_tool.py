@@ -75,14 +75,14 @@ def query_amap_route(
     """公交在可用方案中按耗时及地铁偏好选择，道路取首条；单次请求，不重试。"""
     queried_at = datetime.now(timezone.utc)
 
-    def failed(reason: str) -> RouteSnapshot:
-        return RouteSnapshot("failed", "amap", queried_at, failure_reason=reason)
+    def failed(reason: str, kind: str = "unavailable") -> RouteSnapshot:
+        return RouteSnapshot("failed", "amap", queried_at, failure_reason=reason, failure_kind=kind)
 
     if mode not in ENDPOINTS:
         return failed("不支持的交通方式")
     key = api_key if api_key is not None else os.getenv("AMAP_API_KEY")
     if not key or not key.strip():
-        return failed("未配置高德 Web 服务 Key")
+        return failed("未配置高德 Web 服务 Key", "blocked")
     params = {
         "key": key,
         "origin": f"{origin.longitude:.6f},{origin.latitude:.6f}",
@@ -93,7 +93,7 @@ def query_amap_route(
     if mode == "transit":
         if any(not isinstance(code, str) or not code.isascii() or not code.isdecimal()
                for code in (origin_citycode, destination_citycode)):
-            return failed("公交查询缺少有效城市编码")
+            return failed("公交查询缺少有效城市编码", "blocked")
         params.update(city1=origin_citycode, city2=destination_citycode, AlternativeRoute="5")
         if departure_date is not None:
             params["date"] = departure_date.isoformat()
@@ -113,13 +113,14 @@ def query_amap_route(
     if data.get("status") != "1":
         code = data.get("infocode")
         safe_code = code if isinstance(code, str) and len(code) == 5 and code.isascii() and code.isdecimal() else "未知"
-        return failed(f"高德路线服务拒绝请求（错误码：{safe_code}）")
+        return failed(f"高德路线服务拒绝请求（错误码：{safe_code}）",
+                      "no_route" if safe_code in {"20011", "20800", "20801", "20802", "20803"} else "blocked")
     try:
         plans = data["route"]["transits" if mode == "transit" else "paths"]
         if not isinstance(plans, list):
             raise ValueError("方案必须是列表")
         if not plans:
-            return failed("高德未返回可用路线")
+            return failed("高德未返回可用路线", "no_route")
         # 只在同一公交响应内选方案，不为损坏方案增加网络请求。
         candidates = []
         for plan in (plans if mode == "transit" else plans[:1]):
@@ -143,4 +144,4 @@ def query_amap_route(
             return min(subways, key=lambda route: route.duration_seconds) if subways else fastest
     except (KeyError, TypeError, ValueError, IndexError, OverflowError, AttributeError):
         pass
-    return failed("高德路线方案缺少有效距离、耗时或完整几何")
+    return failed("高德路线方案缺少有效距离、耗时或完整几何", "no_route")

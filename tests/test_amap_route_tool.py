@@ -151,3 +151,19 @@ class AmapRouteTests(unittest.TestCase):
             get.return_value.json.return_value = {"status": "1", "route": {"transits": [
                 plan(600, distance="1000"), plan(600, distance="2000")]}}
             self.assertEqual(self.query("transit", origin_citycode="010", destination_citycode="010").distance_meters, 1000)
+
+    def test_service_failure_classification_and_legacy_snapshot(self):
+        from dataclasses import asdict
+        from core.trip_models import parse_route_snapshot
+        for code, expected in (("10001", "blocked"), ("10003", "blocked"), ("10014", "blocked"),
+                               ("20000", "blocked"), ("40000", "blocked"), ("20802", "no_route"),
+                               ("unknown", "blocked")):
+            with self.subTest(code=code), patch("tools.amap_route_tool.requests.get") as get:
+                get.return_value.json.return_value = {"status": "0", "infocode": code}
+                route = self.query()
+                self.assertEqual(route.failure_kind, expected)
+                raw = asdict(route)
+                raw["queried_at"] = route.queried_at.isoformat()
+                self.assertEqual(parse_route_snapshot(raw), route)
+                del raw["failure_kind"]
+                self.assertIsNone(parse_route_snapshot(raw).failure_kind)

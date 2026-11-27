@@ -31,6 +31,7 @@ class RouteSnapshot:
     duration_seconds: int | None = None
     parts: list[RoutePart] = field(default_factory=list)
     failure_reason: str | None = None
+    failure_kind: str | None = None
 
     def __post_init__(self) -> None:
         if self.status not in ("ok", "failed"):
@@ -41,6 +42,10 @@ class RouteSnapshot:
             raise ValueError("路线查询时间必须包含时区")
         if not isinstance(self.parts, list) or any(not isinstance(p, RoutePart) for p in self.parts):
             raise ValueError("路线分段类型不合法")
+        if self.failure_kind not in (None, "no_route", "blocked", "unavailable"):
+            raise ValueError("路线失败分类不合法")
+        if self.status == "ok" and self.failure_kind is not None:
+            raise ValueError("成功路线不能有失败分类")
         if self.status == "ok":
             if any(type(v) is not int or v <= 0 for v in (self.distance_meters, self.duration_seconds)):
                 raise ValueError("成功路线的距离和耗时必须为正整数")
@@ -65,6 +70,7 @@ def parse_route_snapshot(data: dict | None) -> RouteSnapshot | None:
             duration_seconds=data.get("duration_seconds"),
             parts=[RoutePart(**part) for part in data.get("parts", [])],
             failure_reason=data.get("failure_reason"),
+            failure_kind=data.get("failure_kind"),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("路线快照字段不合法") from exc

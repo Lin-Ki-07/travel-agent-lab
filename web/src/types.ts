@@ -42,6 +42,7 @@ export interface RouteSnapshot {
   duration_seconds: number | null
   parts: RoutePart[]
   failure_reason: string | null
+  failure_kind?: 'no_route' | 'blocked' | 'unavailable' | null
 }
 
 export interface TransportSegment {
