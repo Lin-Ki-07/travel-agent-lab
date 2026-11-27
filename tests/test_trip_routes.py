@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from core.map_view import build_map_days
 from core.trip_models import Activity, RoutePart, RouteSnapshot, TransportSegment
-from core.trip_routes import enrich_trip_routes, refresh_edited_day_routes
+from core.trip_routes import enrich_trip_routes, refresh_edited_day_routes, complete_missing_routes
 from core.trip_service import plan_trip
 from core.trip_store import save_itinerary, load_itinerary
 import test_trip_persistence_edit as fixtures
@@ -18,7 +18,7 @@ class TripRoutesTests(unittest.TestCase):
         fixture = fixtures.TripPersistenceEditTests()
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
-        self.trip = fixture.trip
+        self.trip = replace(fixture.trip, request=replace(fixture.trip.request, preferences=["步行"]))
         self.route = RouteSnapshot("ok", "amap", fixture.now, 100, 61,
                                    [RoutePart("walking", [[120, 30], [120.1, 30.1]])])
 
@@ -50,23 +50,6 @@ class TripRoutesTests(unittest.TestCase):
         self.assertIsNone(segment.estimated_minutes)
         self.assertEqual(segment.route.failure_reason, "超时")
 
-    def test_modes_are_explicit_and_mixed_results_are_independent(self):
-        day = self.trip.daily_plans[0]
-        days = []
-        for index, mode in enumerate(("自驾", "公交", "火车", "步行或打车")):
-            plan_date = day.plan_date + timedelta(days=index)
-            days.append(replace(day, day_number=index + 1, plan_date=plan_date,
-                                weather=replace(day.weather, forecast_date=plan_date),
-                                transport_segments=[replace(day.transport_segments[0], mode=mode, estimated_minutes=20)]))
-        trip = replace(self.trip, request=replace(self.trip.request, days=4), daily_plans=days)
-        with patch("core.trip_routes.query_amap_route", return_value=self.route) as query:
-            result = enrich_trip_routes(trip)
-        self.assertEqual(query.call_count, 2)
-        self.assertEqual(query.call_args.args[2], "driving")
-        self.assertEqual([d.transport_segments[0].route.status for d in result.daily_plans],
-                         ["ok", "ok", "failed", "failed"])
-        self.assertTrue(all(d.transport_segments[0].estimated_minutes is None for d in result.daily_plans[2:]))
-
     def test_single_activity_needs_no_query(self):
         day = replace(self.trip.daily_plans[0], activities=self.trip.daily_plans[0].activities[:1], transport_segments=[])
         with patch("core.trip_routes.query_amap_route") as query:
@@ -83,7 +66,7 @@ class TripRoutesTests(unittest.TestCase):
         for mode in ("公交", "公交车", "公共交通", "地铁", " BUS ", "subway", "metro", "transit"):
             for snapshot in (route, failed):
                 with self.subTest(mode=mode, status=snapshot.status):
-                    trip = replace(self.trip, places=places, daily_plans=[replace(day, transport_segments=[
+                    trip = replace(self.trip, request=replace(self.trip.request, preferences=[]), places=places, daily_plans=[replace(day, transport_segments=[
                         replace(day.transport_segments[0], mode=mode, estimated_minutes=99)])])
                     with patch("core.trip_routes.query_amap_route", return_value=snapshot) as query:
                         result = enrich_trip_routes(trip)
@@ -91,13 +74,13 @@ class TripRoutesTests(unittest.TestCase):
                         origin_citycode="010", destination_citycode="0532", departure_date=day.plan_date)
                     segment = result.daily_plans[0].transport_segments[0]
                     self.assertEqual((segment.mode, segment.route, segment.estimated_minutes),
-                                     (mode, snapshot, 2 if snapshot.status == "ok" else None))
+                                     ("公共交通", snapshot, 2 if snapshot.status == "ok" else None))
 
     def test_transit_missing_either_code_tries_driving_once(self):
         day = self.trip.daily_plans[0]
         for codes in ((None, "010"), ("010", None), (None, None)):
             with self.subTest(codes=codes):
-                trip = replace(self.trip, places=[replace(p, citycode=c) for p, c in zip(self.trip.places, codes)],
+                trip = replace(self.trip, request=replace(self.trip.request, preferences=[]), places=[replace(p, citycode=c) for p, c in zip(self.trip.places, codes)],
                     daily_plans=[replace(day, transport_segments=[replace(day.transport_segments[0], mode="公交")])])
                 with patch("core.trip_routes.query_amap_route", return_value=RouteSnapshot(
                         "failed", "amap", self.trip.generated_at, failure_reason="超时")) as query:
@@ -110,7 +93,7 @@ class TripRoutesTests(unittest.TestCase):
 
     def test_edit_transit_queries_missing_snapshot_then_reuses_alias_snapshot(self):
         day = self.trip.daily_plans[0]
-        original = replace(self.trip, places=[replace(p, citycode="010") for p in self.trip.places])
+        original = replace(self.trip, request=replace(self.trip.request, preferences=[]), places=[replace(p, citycode="010") for p in self.trip.places])
         edited = replace(original, daily_plans=[replace(day, transport_segments=[
             replace(day.transport_segments[0], mode="地铁")])])
         failed = RouteSnapshot("failed", "amap", self.trip.generated_at, failure_reason="无可用方案")
@@ -135,7 +118,7 @@ class TripRoutesTests(unittest.TestCase):
         for mode in ("打车", "出租车", " TAXI "):
             for route in (driving, failed):
                 with self.subTest(mode=mode, status=route.status):
-                    trip = replace(self.trip, daily_plans=[replace(day, transport_segments=[
+                    trip = replace(self.trip, request=replace(self.trip.request, preferences=["自驾"]), daily_plans=[replace(day, transport_segments=[
                         replace(day.transport_segments[0], mode=mode, estimated_minutes=99)])])
                     with patch("core.trip_routes.query_amap_route", return_value=route) as query:
                         result = enrich_trip_routes(trip)
@@ -193,7 +176,7 @@ class TripRoutesTests(unittest.TestCase):
                 failed = RouteSnapshot("failed", "amap", self.trip.generated_at, failure_reason="超时")
                 with patch("core.trip_routes.query_amap_route", return_value=failed) as query:
                     result = refresh_edited_day_routes(self.trip, replace(self.trip, daily_plans=[incoming]), 1)
-                self.assertEqual(query.call_count, int(mode in ("步行", "自驾", "打车", "公交")))
+                self.assertEqual(query.call_count, 1)
                 segment = result.daily_plans[0].transport_segments[0]
                 self.assertEqual(segment.route.status, "failed")
                 self.assertIsNone(segment.estimated_minutes)
@@ -252,7 +235,7 @@ class TripRoutesTests(unittest.TestCase):
 
     def test_bounded_transit_fallbacks_and_thresholds(self):
         day = self.trip.daily_plans[0]
-        trip = replace(self.trip, places=[replace(p, citycode="010") for p in self.trip.places],
+        trip = replace(self.trip, request=replace(self.trip.request, preferences=[]), places=[replace(p, citycode="010") for p in self.trip.places],
                        daily_plans=[replace(day, transport_segments=[replace(day.transport_segments[0], mode="公交")])])
         no_route = RouteSnapshot("failed", "amap", self.trip.generated_at,
                                  failure_reason="无方案", failure_kind="no_route")
@@ -261,11 +244,11 @@ class TripRoutesTests(unittest.TestCase):
         for distance, responses, modes, actual in (
             (800, [replace(self.route, distance_meters=1200, duration_seconds=1200)], ["walking"], "步行"),
             (800, [replace(self.route, distance_meters=1201), no_route, driving], ["walking", "transit", "driving"], "驾车"),
-            (800, [replace(self.route, duration_seconds=1201), no_route, no_route], ["walking", "transit", "driving"], "公交"),
+            (800, [replace(self.route, duration_seconds=1201), no_route, no_route], ["walking", "transit", "driving"], "公共交通"),
             (801, [no_route, driving], ["transit", "driving"], "驾车"),
-            (800, [blocked], ["walking"], "公交"),
-            (801, [blocked], ["transit"], "公交"),
-            (801, [replace(no_route, failure_kind="unavailable")], ["transit"], "公交"),
+            (800, [blocked], ["walking"], "公共交通"),
+            (801, [blocked], ["transit"], "公共交通"),
+            (801, [replace(no_route, failure_kind="unavailable")], ["transit"], "公共交通"),
         ):
             with self.subTest(distance=distance, modes=modes), patch("core.trip_routes._straight_distance", return_value=distance), patch("core.trip_routes.query_amap_route", side_effect=responses) as query:
                 result = enrich_trip_routes(trip)
@@ -283,9 +266,54 @@ class TripRoutesTests(unittest.TestCase):
     def test_explicit_road_preferences_do_not_fallback_even_when_near(self):
         day = self.trip.daily_plans[0]
         for mode, query_mode in (("自驾", "driving"), ("打车", "driving"), ("步行", "walking")):
-            trip = replace(self.trip, daily_plans=[replace(day, transport_segments=[replace(day.transport_segments[0], mode=mode)])])
+            trip = replace(self.trip, request=replace(self.trip.request, preferences=[mode]), daily_plans=[replace(day, transport_segments=[replace(day.transport_segments[0], mode="公交")])])
             failed = RouteSnapshot("failed", "amap", self.trip.generated_at, failure_reason="无方案", failure_kind="no_route")
             with self.subTest(mode=mode), patch("core.trip_routes._straight_distance", return_value=1), patch("core.trip_routes.query_amap_route", return_value=failed) as query:
                 result = enrich_trip_routes(trip)
                 query.assert_called_once_with(trip.places[0], trip.places[1], query_mode)
-                self.assertEqual(result.daily_plans[0].transport_segments[0].mode, "驾车" if mode == "打车" else mode)
+                self.assertEqual(result.daily_plans[0].transport_segments[0].mode, "步行" if query_mode == "walking" else "驾车")
+
+    def test_default_policy_ignores_model_mode_in_all_query_entries(self):
+        day = self.trip.daily_plans[0]
+        transit = replace(self.route, parts=[replace(self.route.parts[0], mode="transit")])
+        for preferences in ([], ["美食"], ["不自驾"], ["自驾游"], ["步行或自驾"], ["自驾", "地铁"]):
+            for model_mode in ("驾车", "自驾", "步行", "打车约10分钟", "火车"):
+                for distance, expected, snapshot in ((800, "walking", self.route), (801, "transit", transit)):
+                    with self.subTest(preferences=preferences, model_mode=model_mode, distance=distance):
+                        trip = replace(self.trip, request=replace(self.trip.request, preferences=preferences),
+                            places=[replace(p, citycode="010") for p in self.trip.places],
+                            daily_plans=[replace(day, transport_segments=[replace(day.transport_segments[0], mode=model_mode)])])
+                        for run in (enrich_trip_routes, complete_missing_routes,
+                                    lambda value: refresh_edited_day_routes(value, value, 1)):
+                            with patch("core.trip_routes._straight_distance", return_value=distance), patch(
+                                    "core.trip_routes.query_amap_route", return_value=snapshot) as query:
+                                segment = run(trip).daily_plans[0].transport_segments[0]
+                            self.assertEqual(query.call_count, 1)
+                            self.assertEqual(query.call_args.args[2], expected)
+                            self.assertEqual(segment.mode, "步行" if expected == "walking" else "公共交通")
+                            self.assertEqual(segment.route, snapshot)
+
+    def test_explicit_preference_reaches_edit_and_completion(self):
+        for preference, expected in ((" 自驾 ", "driving"), (" TAXI ", "driving"),
+                                     ("步行", "walking"), ("地铁", "transit")):
+            trip = replace(self.trip, request=replace(self.trip.request, preferences=[preference]),
+                           places=[replace(p, citycode="010") for p in self.trip.places])
+            for run in (enrich_trip_routes, complete_missing_routes,
+                        lambda value: refresh_edited_day_routes(value, value, 1)):
+                with self.subTest(preference=preference), patch(
+                        "core.trip_routes._straight_distance", return_value=801), patch(
+                        "core.trip_routes.query_amap_route", return_value=self.route) as query:
+                    segment = run(trip).daily_plans[0].transport_segments[0]
+                self.assertEqual(query.call_count, 1)
+                self.assertEqual(query.call_args.args[2], expected)
+                self.assertEqual(segment.mode, {"driving": "驾车", "walking": "步行", "transit": "公共交通"}[expected])
+
+    def test_default_completion_keeps_successful_driving_snapshot(self):
+        day = self.trip.daily_plans[0]
+        segment = replace(day.transport_segments[0], mode="驾车", route=self.route, estimated_minutes=2)
+        trip = replace(self.trip, request=replace(self.trip.request, preferences=[]),
+                       daily_plans=[replace(day, transport_segments=[segment])])
+        with patch("core.trip_routes.query_amap_route") as query:
+            result = complete_missing_routes(trip)
+        query.assert_not_called()
+        self.assertIs(result.daily_plans[0].transport_segments[0], segment)

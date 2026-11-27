@@ -1,11 +1,10 @@
 """由确定性后端流程补充路线事实，不调用模型。"""
 
 from dataclasses import replace
-from datetime import datetime, timezone
 from math import radians, sin, cos, asin, sqrt
 
 from core.itinerary_validator import validate_itinerary
-from core.trip_models import Itinerary, RouteSnapshot
+from core.trip_models import Itinerary
 from tools.amap_route_tool import query_amap_route
 
 
@@ -28,42 +27,51 @@ def _straight_distance(origin, destination):
     return 6371000 * 2 * asin(sqrt(min(1, max(0, value))))
 
 
-def _query_segment_route(segment, places, plan_date):
-    mode = MODE_ALIASES.get(segment.mode.strip().lower())
+MODE_LABELS = {"walking": "步行", "transit": "公共交通", "driving": "驾车"}
+
+
+def _preferred_mode(preferences):
+    """只接受完整方式词；否定、复合及冲突表达不猜测。"""
+    modes = {MODE_ALIASES[item.strip().lower()] for item in preferences
+             if item.strip().lower() in MODE_ALIASES}
+    return next(iter(modes)) if len(modes) == 1 else None
+
+
+def _query_segment_route(segment, places, plan_date, preferences):
+    mode = _preferred_mode(preferences)
     origin, destination = places[segment.from_place_id], places[segment.to_place_id]
-    if mode is None:
-        return RouteSnapshot("failed", "amap", datetime.now(timezone.utc),
-                             failure_reason="不支持的交通方式，未查询路线"), segment.mode
-    if mode != "transit":
-        return query_amap_route(origin, destination, mode), segment.mode
+    if mode in ("walking", "driving"):
+        return query_amap_route(origin, destination, mode), MODE_LABELS[mode]
+    # 模型 mode 不是用户偏好；无明确偏好时统一执行距离策略。
+    actual_mode = "公共交通"
     if _straight_distance(origin, destination) <= 800:
         walking = query_amap_route(origin, destination, "walking")
         if walking.status == "ok":
             if walking.distance_meters <= 1200 and walking.duration_seconds <= 1200:
                 return walking, "步行"
         elif walking.failure_kind != "no_route":
-            return walking, segment.mode
+            return walking, actual_mode
     if origin.citycode is not None and destination.citycode is not None:
         transit = query_amap_route(origin, destination, "transit",
                                    origin_citycode=origin.citycode,
                                    destination_citycode=destination.citycode,
                                    departure_date=plan_date)
         if transit.status == "ok" or transit.failure_kind != "no_route":
-            return transit, segment.mode
+            return transit, actual_mode
     # 缺城市编码或明确无可用方案时才尝试驾车；未知/权限/配额/参数故障停止。
     driving = query_amap_route(origin, destination, "driving")
-    return driving, "驾车" if driving.status == "ok" else segment.mode
+    return driving, "驾车" if driving.status == "ok" else actual_mode
 
 
 def enrich_trip_routes(itinerary: Itinerary) -> Itinerary:
-    """为新行程所有交通段补充快照；未知方式及查询失败不阻断行程。"""
+    """为新行程所有交通段补充快照；按请求偏好选择方式，查询失败不阻断行程。"""
     validate_itinerary(itinerary)
     places = {place.place_id: place for place in itinerary.places}
     days = []
     for day in itinerary.daily_plans:
         segments = []
         for segment in day.transport_segments:
-            route, actual_mode = _query_segment_route(segment, places, day.plan_date)
+            route, actual_mode = _query_segment_route(segment, places, day.plan_date, itinerary.request.preferences)
             minutes = ((route.duration_seconds + 59) // 60 if route.status == "ok" else None)
             segments.append(replace(segment, mode=actual_mode, route=route, estimated_minutes=minutes))
         days.append(replace(day, transport_segments=segments))
@@ -112,7 +120,7 @@ def refresh_edited_day_routes(
         places = {place.place_id: place for place in edited.places}
         for index in pending:
             segment = segments[index]
-            route, actual_mode = _query_segment_route(segment, places, new_day.plan_date)
+            route, actual_mode = _query_segment_route(segment, places, new_day.plan_date, edited.request.preferences)
             minutes = ((route.duration_seconds + 59) // 60 if route.status == "ok" else None)
             segments[index] = replace(segment, mode=actual_mode, route=route, estimated_minutes=minutes)
     days = list(edited.daily_plans)
@@ -131,7 +139,7 @@ def complete_missing_routes(itinerary: Itinerary) -> Itinerary:
             if segment.route is not None and segment.route.status == "ok":
                 segments.append(segment)
                 continue
-            route, mode = _query_segment_route(segment, places, day.plan_date)
+            route, mode = _query_segment_route(segment, places, day.plan_date, itinerary.request.preferences)
             minutes = (route.duration_seconds + 59) // 60 if route.status == "ok" else None
             segments.append(replace(segment, mode=mode, route=route, estimated_minutes=minutes))
         days.append(replace(day, transport_segments=segments))
