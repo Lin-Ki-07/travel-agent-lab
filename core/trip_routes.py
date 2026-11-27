@@ -14,23 +14,30 @@ MODE_ALIASES = {
     "驾车": "driving", "自驾": "driving", "driving": "driving",
     # 打车复用驾车道路几何与行驶耗时，不包含接驾时间或车费。
     "打车": "driving", "出租车": "driving", "taxi": "driving",
-    "公交": "transit", "公共交通": "transit", "地铁": "transit", "transit": "transit",
+    "公交": "transit", "公交车": "transit", "公共交通": "transit", "地铁": "transit",
+    "bus": "transit", "subway": "transit", "metro": "transit", "transit": "transit",
 }
 
 
-def _query_segment_route(segment, places) -> RouteSnapshot:
+def _query_segment_route(segment, places, plan_date) -> RouteSnapshot:
     mode = MODE_ALIASES.get(segment.mode.strip().lower())
+    origin = places[segment.from_place_id]
+    destination = places[segment.to_place_id]
     reason = None
     if mode is None:
         reason = "不支持的交通方式，未查询路线"
-    elif mode == "transit":
+    elif mode == "transit" and (origin.citycode is None or destination.citycode is None):
         reason = "公交查询缺少可靠城市编码，未查询路线"
     if reason:
         route = RouteSnapshot("failed", "amap", datetime.now(timezone.utc),
                               failure_reason=reason)
+    elif mode == "transit":
+        route = query_amap_route(origin, destination, mode,
+                                 origin_citycode=origin.citycode,
+                                 destination_citycode=destination.citycode,
+                                 departure_date=plan_date)
     else:
-        route = query_amap_route(places[segment.from_place_id],
-                                 places[segment.to_place_id], mode)
+        route = query_amap_route(origin, destination, mode)
     return route
 
 
@@ -42,7 +49,7 @@ def enrich_trip_routes(itinerary: Itinerary) -> Itinerary:
     for day in itinerary.daily_plans:
         segments = []
         for segment in day.transport_segments:
-            route = _query_segment_route(segment, places)
+            route = _query_segment_route(segment, places, day.plan_date)
             minutes = ((route.duration_seconds + 59) // 60 if route.status == "ok" else None)
             segments.append(replace(segment, route=route, estimated_minutes=minutes))
         days.append(replace(day, transport_segments=segments))
@@ -91,7 +98,7 @@ def refresh_edited_day_routes(
         places = {place.place_id: place for place in edited.places}
         for index in pending:
             segment = segments[index]
-            route = _query_segment_route(segment, places)
+            route = _query_segment_route(segment, places, new_day.plan_date)
             minutes = ((route.duration_seconds + 59) // 60 if route.status == "ok" else None)
             segments[index] = replace(segment, route=route, estimated_minutes=minutes)
     days = list(edited.daily_plans)

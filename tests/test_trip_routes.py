@@ -74,6 +74,59 @@ class TripRoutesTests(unittest.TestCase):
         query.assert_not_called()
         self.assertEqual(result.daily_plans[0].transport_segments, [])
 
+    def test_transit_aliases_pass_endpoint_codes_and_day_date_once(self):
+        day = self.trip.daily_plans[0]
+        places = [replace(self.trip.places[0], citycode="010"),
+                  replace(self.trip.places[1], citycode="0532")]
+        route = replace(self.route, parts=[replace(self.route.parts[0], mode="transit")])
+        failed = RouteSnapshot("failed", "amap", self.trip.generated_at, failure_reason="超时")
+        for mode in ("公交", "公交车", "公共交通", "地铁", " BUS ", "subway", "metro", "transit"):
+            for snapshot in (route, failed):
+                with self.subTest(mode=mode, status=snapshot.status):
+                    trip = replace(self.trip, places=places, daily_plans=[replace(day, transport_segments=[
+                        replace(day.transport_segments[0], mode=mode, estimated_minutes=99)])])
+                    with patch("core.trip_routes.query_amap_route", return_value=snapshot) as query:
+                        result = enrich_trip_routes(trip)
+                    query.assert_called_once_with(places[0], places[1], "transit",
+                        origin_citycode="010", destination_citycode="0532", departure_date=day.plan_date)
+                    segment = result.daily_plans[0].transport_segments[0]
+                    self.assertEqual((segment.mode, segment.route, segment.estimated_minutes),
+                                     (mode, snapshot, 2 if snapshot.status == "ok" else None))
+
+    def test_transit_missing_either_code_does_not_query(self):
+        day = self.trip.daily_plans[0]
+        for codes in ((None, "010"), ("010", None), (None, None)):
+            with self.subTest(codes=codes):
+                trip = replace(self.trip, places=[replace(p, citycode=c) for p, c in zip(self.trip.places, codes)],
+                    daily_plans=[replace(day, transport_segments=[replace(day.transport_segments[0], mode="公交")])])
+                with patch("core.trip_routes.query_amap_route") as query:
+                    segment = enrich_trip_routes(trip).daily_plans[0].transport_segments[0]
+                query.assert_not_called()
+                self.assertEqual(segment.route.status, "failed")
+                self.assertIn("城市编码", segment.route.failure_reason)
+                self.assertEqual(segment.route.parts, [])
+                self.assertIsNone(segment.estimated_minutes)
+
+    def test_edit_transit_queries_missing_snapshot_then_reuses_alias_snapshot(self):
+        day = self.trip.daily_plans[0]
+        original = replace(self.trip, places=[replace(p, citycode="010") for p in self.trip.places])
+        edited = replace(original, daily_plans=[replace(day, transport_segments=[
+            replace(day.transport_segments[0], mode="地铁")])])
+        failed = RouteSnapshot("failed", "amap", self.trip.generated_at, failure_reason="无可用方案")
+        transit = replace(self.route, parts=[replace(self.route.parts[0], mode="transit")])
+        for snapshot in (transit, failed):
+            with self.subTest(status=snapshot.status):
+                with patch("core.trip_routes.query_amap_route", return_value=snapshot) as query:
+                    result = refresh_edited_day_routes(original, edited, 1)
+                query.assert_called_once_with(original.places[0], original.places[1], "transit",
+                    origin_citycode="010", destination_citycode="010", departure_date=day.plan_date)
+                alias = replace(edited, daily_plans=[replace(edited.daily_plans[0], transport_segments=[
+                    replace(edited.daily_plans[0].transport_segments[0], mode=" METRO ")])])
+                with patch("core.trip_routes.query_amap_route") as query:
+                    reused = refresh_edited_day_routes(result, alias, 1)
+                query.assert_not_called()
+                self.assertEqual(reused.daily_plans[0].transport_segments[0].route, snapshot)
+
     def test_taxi_aliases_query_driving_once_and_preserve_requested_mode(self):
         day = self.trip.daily_plans[0]
         driving = replace(self.route, parts=[replace(self.route.parts[0], mode="driving")])
