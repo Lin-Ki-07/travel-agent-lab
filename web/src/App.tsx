@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import { runRouteReplan } from './routeReplan'
+import { runRouteCompletion } from './routeCompletion'
 import {
   createPlan,
   completePlanRoutes,
@@ -528,14 +529,22 @@ export default function App() {
     if (!selected || !isSaved || routeOperation.current || completingRoutes || replanningRoutes || savingEdit) return
     routeOperation.current = true
     const chatId = currentChat.id
+    let codesSaved = false
     setCompletingRoutes(true)
     setNotice(null)
     try {
-      const updated = await completePlanRoutes(selected.plan_id)
-      updateChat(chatId, { plan: updated })
-      setNotice({ kind: 'success', text: '交通补全已完成。' })
+      const outcome = await runRouteCompletion(selected.plan_id,
+        completePlanCitycodes, completePlanRoutes, (plan) => {
+          codesSaved = true
+          updateChat(chatId, { plan })
+        })
+      setNotice(outcome === 'missing'
+        ? { kind: 'error', text: '部分地点缺少城市编码，暂未补全交通。' }
+        : { kind: 'success', text: '交通补全已完成。' })
     } catch (error) {
-      setNotice({ kind: 'error', text: errorText(error, '交通补全失败，请重新打开行程。') })
+      setNotice({ kind: 'error', text: codesSaved
+        ? '地点资料已更新，交通补全失败，请重新打开行程。'
+        : errorText(error, '地点资料补齐失败，暂未补全交通。') })
     } finally {
       routeOperation.current = false
       setCompletingRoutes(false)
