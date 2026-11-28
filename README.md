@@ -1,4 +1,5 @@
 <div align="center">
+  <img src="assets/travel-agent-logo.png" width="112" height="112" alt="Travel Agent Lab 标识：青绿色底板上的米白折叠地图与蜿蜒路线">
   <h1>Travel Agent Lab</h1>
   <h3>从一个旅行想法，到地图上的逐日行程</h3>
   <p>结合真实地点、天气与网页资料的本地旅行规划 Agent。</p>
