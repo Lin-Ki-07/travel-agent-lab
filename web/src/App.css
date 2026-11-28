@@ -1168,6 +1168,10 @@ body {
 /* Keep both panel handles reachable on compact windows. */
 .workspace-panels { grid-template-rows: minmax(0, 1fr); }
 .workspace-panels > .floating-workspace:first-child { min-width: 0; }
+.workspace-panels > .floating-workspace:first-child.is-collapsed {
+  border-top-right-radius: 28px;
+  border-bottom-right-radius: 28px;
+}
 .workspace-panels:has(> .is-collapsed) > .details-workspace {
   border-radius: 28px; border-left: 1px solid #ffffffa0;
 }
