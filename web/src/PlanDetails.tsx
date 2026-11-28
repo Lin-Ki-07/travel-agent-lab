@@ -8,6 +8,8 @@ export interface PlanDetailsProps {
   isSaved: boolean
   saving: boolean
   savingEdit: boolean
+  selectedDayIndex: number
+  onDayIndexChange: (index: number) => void
   completingRoutes: boolean
   onCompleteRoutes: () => void
   replanningRoutes: boolean
@@ -16,7 +18,7 @@ export interface PlanDetailsProps {
   onEditDay: (dayNumber: number, body: EditDayRequest) => Promise<void>
 }
 
-export default function PlanDetails({ plan, notice, isSaved, saving, savingEdit, onSave, onEditDay, completingRoutes, onCompleteRoutes, replanningRoutes, onReplanRoutes }: PlanDetailsProps) {
+export default function PlanDetails({ plan, notice, isSaved, saving, savingEdit, onSave, onEditDay, completingRoutes, onCompleteRoutes, replanningRoutes, onReplanRoutes, selectedDayIndex, onDayIndexChange }: PlanDetailsProps) {
   return (
     <div className="plan-details">
             {notice && (
@@ -37,6 +39,8 @@ export default function PlanDetails({ plan, notice, isSaved, saving, savingEdit,
             </div>
             <ItineraryView
               itinerary={plan.itinerary}
+              selectedDayIndex={selectedDayIndex}
+              onDayIndexChange={onDayIndexChange}
               editable={isSaved}
               savingEdit={savingEdit}
               onEditDay={onEditDay}

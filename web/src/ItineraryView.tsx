@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { clampDayIndex } from './mapModel'
 import DayEditor from './DayEditor'
 import type { EditDayRequest } from './api'
 import type { Itinerary } from './types'
@@ -17,6 +18,8 @@ interface ItineraryViewProps {
   itinerary: Itinerary
   editable: boolean
   savingEdit: boolean
+  selectedDayIndex?: number
+  onDayIndexChange?: (index: number) => void
   replanningRoutes?: boolean
   onReplanRoutes?: () => void
   completingRoutes?: boolean
@@ -25,12 +28,13 @@ interface ItineraryViewProps {
 }
 
 export default function ItineraryView({
-  itinerary, editable, savingEdit, onEditDay, completingRoutes = false, onCompleteRoutes, replanningRoutes = false, onReplanRoutes,
+  itinerary, editable, savingEdit, onEditDay, completingRoutes = false, onCompleteRoutes, replanningRoutes = false, onReplanRoutes, selectedDayIndex, onDayIndexChange,
 }: ItineraryViewProps) {
   const [editingDay, setEditingDay] = useState<number | null>(null)
   const [dayIndex, setDayIndex] = useState(0)
   const { places, daily_plans: days } = itinerary
-  const selectedDay = days[Math.min(dayIndex, days.length - 1)]
+  const safeIndex = clampDayIndex(selectedDayIndex ?? dayIndex, days.length)
+  const selectedDay = days[safeIndex]
 
   return (
     <div className="itinerary">
@@ -40,9 +44,9 @@ export default function ItineraryView({
             key={day.day_number}
             type="button"
             role="tab"
-            aria-selected={index === dayIndex}
-            className={index === dayIndex ? 'day-tab active' : 'day-tab'}
-            onClick={() => setDayIndex(index)}
+            aria-selected={index === safeIndex}
+            className={index === safeIndex ? 'day-tab active' : 'day-tab'}
+            onClick={() => { setDayIndex(index); onDayIndexChange?.(index) }}
           >
             第 {day.day_number} 天
           </button>

@@ -148,6 +148,13 @@ export default function App() {
 
   const currentChat = chats.find((chat) => chat.id === selectedId)!
   const selected = currentChat.plan
+  const daySelectionKey = `${currentChat.id}:${selected?.plan_id ?? ''}`
+  const [daySelectionOwner, setDaySelectionOwner] = useState(daySelectionKey)
+  // Reset during render so the new itinerary never paints the previous one's day.
+  if (daySelectionOwner !== daySelectionKey) {
+    setDaySelectionOwner(daySelectionKey)
+    setMapDayIndex(0)
+  }
   const isSaved = selected !== null && savedIds.has(selected.plan_id)
   useEffect(() => {
     let cancelled = false
@@ -765,6 +772,7 @@ export default function App() {
         <h2>行程详情</h2>
         {selected ? (
           <PlanDetails key={currentChat.id} plan={selected} notice={notice} isSaved={isSaved}
+            selectedDayIndex={mapDayIndex} onDayIndexChange={setMapDayIndex}
             completingRoutes={completingRoutes} onCompleteRoutes={handleCompleteRoutes}
             replanningRoutes={replanningRoutes} onReplanRoutes={handleReplanRoutes}
             saving={saving} savingEdit={savingEdit || completingRoutes || replanningRoutes} onSave={handleSave} onEditDay={handleEditDay} />
